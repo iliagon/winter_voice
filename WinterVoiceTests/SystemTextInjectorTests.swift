@@ -133,17 +133,36 @@ final class SystemTextInjectorTests: XCTestCase {
         XCTAssertEqual(outcome, InsertionOutcome(landedInSecureField: true))
     }
 
-    func testRefusesWhenTargetApplicationReportsNoFocusedField() async throws {
+    /// Browsers report "no focused element" for a focused web text field
+    /// while their web accessibility tree is off, so that answer must not
+    /// abort the dictation: the text is pasted into the verified frontmost
+    /// app instead.
+    func testPastesWhenTargetApplicationReportsNoFocusedField() async throws {
         let harness = try makeHarness(focusedElementQuery: FocusedElementQuery.none)
         let target = try harness.injector.captureTarget()
 
-        do {
-            _ = try await harness.injector.insert("dictated text", into: target)
-            XCTFail("Expected insert to refuse when the app reports no focused element")
-        } catch let failure as DictationFailure {
-            XCTAssertEqual(failure.message, "No text field is focused in the target application.")
-        }
-        XCTAssertTrue(harness.pasteboard.writtenTranscriptions.isEmpty, "Nothing may reach the clipboard when the paste would land nowhere")
+        let outcome = try await harness.injector.insert("dictated text", into: target)
+
+        XCTAssertEqual(outcome, InsertionOutcome(landedInSecureField: false))
+        XCTAssertEqual(harness.pasteboard.writtenTranscriptions, ["dictated text"])
+        XCTAssertTrue(harness.directWriteElements.value.isEmpty, "Without a resolved field there is nothing to write into directly")
+    }
+
+    /// A lazily built accessibility tree answers "nothing" first and the real
+    /// field a moment later; the retry must pick that field up.
+    func testAdoptsFieldThatAppearsAfterAnInitialNoFocusAnswer() async throws {
+        let lateElement = AXUIElementCreateApplication(1)
+        let harness = try makeHarness(
+            focusedElementSequence: [.none, .none, .element(lateElement)],
+            directWriteResult: true
+        )
+        let target = try harness.injector.captureTarget()
+
+        _ = try await harness.injector.insert("dictated text", into: target)
+
+        let adopted = try XCTUnwrap(harness.directWriteElements.value.first)
+        XCTAssertTrue(CFEqual(adopted, lateElement))
+        XCTAssertTrue(harness.pasteboard.writtenTranscriptions.isEmpty)
     }
 
     private struct Harness {
@@ -158,8 +177,11 @@ final class SystemTextInjectorTests: XCTestCase {
         keystrokeError: DictationFailure? = nil,
         capturedElement: AXUIElement? = nil,
         focusedElementQuery: FocusedElementQuery = .unanswered,
+        focusedElementSequence: [FocusedElementQuery]? = nil,
         directWriteResult: Bool = false
     ) throws -> Harness {
+        // A sequence answers one entry per query and then repeats its last.
+        let remainingAnswers = Box(focusedElementSequence ?? [focusedElementQuery])
         let application = try frontmostApplicationSatisfyingActivateAndVerify()
         let pasteboard = PasteboardSessionSpy(writeSucceeds: writeSucceeds)
         let priorItem = NSPasteboardItem()
@@ -179,7 +201,9 @@ final class SystemTextInjectorTests: XCTestCase {
                 directWriteElements.value.append(element)
                 return directWriteResult
             },
-            focusedElementQuery: { _ in focusedElementQuery }
+            focusedElementQuery: { _ in
+                remainingAnswers.value.count > 1 ? remainingAnswers.value.removeFirst() : remainingAnswers.value[0]
+            }
         )
         return Harness(injector: injector, pasteboard: pasteboard, directWriteElements: directWriteElements)
     }

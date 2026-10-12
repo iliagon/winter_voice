@@ -240,7 +240,7 @@ final class SystemTextInjector: TextInjecting {
                 recovery: "Focus the field and dictate again. Nothing was pasted."
             )
         }
-        switch focusedElementQuery(target.application.processIdentifier) {
+        switch try await settledFocusedElementQuery(for: target.application.processIdentifier) {
         case .element(let current):
             if let element = target.element, CFEqual(current, element) { return target }
             // The secure flag is sticky: a field that was secure at capture
@@ -252,21 +252,32 @@ final class SystemTextInjector: TextInjecting {
                 isSecureField: target.isSecureField
                     || SystemFocusedAccessibilityTargetLocator.isSecureTextElement(current)
             )
-        case .none:
-            // The app answers AX and states nothing is focused: a synthesized
-            // paste would land nowhere while looking like a success.
-            throw DictationFailure(
-                message: "No text field is focused in the target application.",
-                recovery: "Focus the field and dictate again. Nothing was pasted."
-            )
-        case .unanswered:
-            // The app answers AX poorly or not at all (Electron before its
-            // tree hydrates, apps without AX support). The frontmost check
-            // above is the only verification available; paste keystrokes go
-            // to the frontmost app regardless of AX, so proceed without a
+        case .none, .unanswered:
+            // The app gives no usable answer about its focus. `.unanswered`
+            // is Electron before its tree hydrates or an app without AX
+            // support. `.none` used to abort as "nothing is focused", but
+            // browsers report exactly that for a focused web text field while
+            // their web accessibility tree is off, so refusing threw away
+            // dictations into ordinary web pages. The frontmost check above
+            // is the verification available in both cases; paste keystrokes
+            // go to the frontmost app regardless of AX, so proceed without a
             // field-level target.
             return CapturedTarget(application: target.application, element: nil, isSecureField: target.isSecureField)
         }
+    }
+
+    /// Asks which element is focused, giving an app that answers "nothing"
+    /// a few short retries: a lazily built accessibility tree often reports
+    /// no focus first and the real field moments later, and a resolved field
+    /// allows the direct write and the secure-field check.
+    private func settledFocusedElementQuery(for processIdentifier: pid_t) async throws -> FocusedElementQuery {
+        var answer = focusedElementQuery(processIdentifier)
+        for _ in 0..<3 {
+            guard case .none = answer else { break }
+            try await sleep(.milliseconds(100))
+            answer = focusedElementQuery(processIdentifier)
+        }
+        return answer
     }
 
     private static func systemFocusedElementQuery(for processIdentifier: pid_t) -> FocusedElementQuery {
