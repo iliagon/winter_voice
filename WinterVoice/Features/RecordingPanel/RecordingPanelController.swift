@@ -116,7 +116,13 @@ final class RecordingPanelController {
         hostingView = hosting
         panel.contentView = hosting
         applyRootView()
+        // `@Published` emits from willSet, so a synchronous sink would measure
+        // `fittingSize` while the view still shows the previous state and
+        // leave the panel one state behind — an idle-pill-sized window around
+        // the failure card. Hopping to the next main-queue turn sizes the
+        // panel for the state actually on screen.
         presenter.$state
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] state in
                 self?.latestState = state
                 self?.render()

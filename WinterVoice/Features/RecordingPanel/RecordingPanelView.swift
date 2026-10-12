@@ -97,22 +97,24 @@ struct RecordingPanelView: View {
             // The panel is sized from `fittingSize`, which measures at the
             // ideal width — for plain Text that is one unwrapped line, so
             // longer failures rendered as a single truncated "…" line.
-            // Pinning the ideal width and letting the text wrap (capped at
-            // two lines) keeps failures readable without an oversized card.
+            // Pinning the width and letting the text wrap keeps
+            // failures readable. The line caps are sized so every failure
+            // the app ships fits in full; they only guard against an
+            // unbounded card for unexpectedly long text.
             Text(failure.message)
                 .font(.wv(11.5, .semibold))
                 .foregroundStyle(.white)
-                .lineLimit(2)
+                .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
             Text(failure.recovery)
                 .font(.wv(10))
                 .foregroundStyle(.white.opacity(0.65))
-                .lineLimit(2)
+                .lineLimit(4)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .frame(idealWidth: 200, maxWidth: 200, alignment: .leading)
+        .frame(width: 240, alignment: .leading)
         .background(panelBackground(in: RoundedRectangle(cornerRadius: 14, style: .continuous)))
     }
 

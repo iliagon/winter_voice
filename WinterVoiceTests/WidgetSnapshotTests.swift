@@ -67,6 +67,74 @@ final class WidgetSnapshotTests: XCTestCase {
             recovery: "Check your internet connection, verify the server URL in Settings, and then try dictating again."
         )))
         try snap("error-long", style: .labeled)
+
+        // The longest strings the app actually ships — these must render in
+        // full, unlike the synthetic overflow case above.
+        relay.publish(.failed(DictationFailure(
+            message: "Remote transcription failed (HTTP 503).",
+            recovery: "whisper.cpp models begin with the ggml header. Download a ggml-*.bin model and try again."
+        )))
+        try snap("error-shipped-longest", style: .labeled)
+
+        relay.publish(.failed(DictationFailure(
+            message: "The remote provider returned an invalid response.",
+            recovery: "Open Settings and allow WinterVoice in Privacy & Security → Accessibility."
+        )))
+        try snap("error-shipped-wide", style: .labeled)
+    }
+}
+
+/// The panel is a borderless window sized by hand from the SwiftUI content;
+/// if it lags the content, the failure card is squeezed into the idle pill's
+/// frame and its text truncates.
+@MainActor
+final class RecordingPanelSizingTests: XCTestCase {
+    func testPanelFrameTracksFailureCard() throws {
+        let suite = UserDefaults(suiteName: "recording-panel-sizing-tests")!
+        suite.removePersistentDomain(forName: "recording-panel-sizing-tests")
+        let relay = DictationStateRelay()
+        let presenter = DictationPresenter(
+            interactor: SnapshotInteractorFake(),
+            relay: relay,
+            hotkeyRelay: HotkeyHealthRelay(),
+            permissionManager: SnapshotPermissionFake(),
+            router: AppRouter()
+        )
+        let existing = Set(NSApp.windows.map(ObjectIdentifier.init))
+        let controller = RecordingPanelController(
+            presenter: presenter,
+            levelMeter: AudioLevelMeter(),
+            preferences: WidgetPreferences(defaults: suite),
+            defaults: suite
+        )
+        let panel = try XCTUnwrap(NSApp.windows.first { !existing.contains(ObjectIdentifier($0)) })
+        defer { panel.orderOut(nil); _ = controller }
+
+        func settle() { RunLoop.main.run(until: Date().addingTimeInterval(0.3)) }
+        func assertPanelFitsContent(_ label: String, file: StaticString = #filePath, line: UInt = #line) throws {
+            let fitting = try XCTUnwrap(panel.contentView).fittingSize
+            XCTAssertEqual(panel.frame.width, fitting.width, accuracy: 1, label, file: file, line: line)
+            XCTAssertEqual(panel.frame.height, fitting.height, accuracy: 1, label, file: file, line: line)
+        }
+
+        settle()
+        try assertPanelFitsContent("idle")
+        let idleSize = panel.frame.size
+
+        relay.publish(.failed(DictationFailure(
+            message: "The remote provider returned an invalid response.",
+            recovery: "whisper.cpp models begin with the ggml header. Download a ggml-*.bin model and try again."
+        )))
+        settle()
+        try assertPanelFitsContent("failed")
+        XCTAssertGreaterThan(panel.frame.width, idleSize.width)
+        XCTAssertGreaterThan(panel.frame.height, idleSize.height)
+
+        relay.publish(.idle)
+        settle()
+        try assertPanelFitsContent("idle again")
+        XCTAssertEqual(panel.frame.width, idleSize.width, accuracy: 1)
+        XCTAssertEqual(panel.frame.height, idleSize.height, accuracy: 1)
     }
 }
 
