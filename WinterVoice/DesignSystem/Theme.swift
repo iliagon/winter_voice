@@ -167,7 +167,7 @@ final class ThemeStore: ObservableObject {
 
 // MARK: - Token accessors
 
-/// Central design tokens for WinterVoice. Every token is an appearance-dynamic
+/// Central design tokens for MacVoice. Every token is an appearance-dynamic
 /// color: it resolves to the Black palette under a dark appearance and the
 /// Light palette under a light one. A theme switch therefore only flips the
 /// window's appearance (`preferredColorScheme` + `WindowConfigurator`) and

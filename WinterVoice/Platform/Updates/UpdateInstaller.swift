@@ -266,7 +266,7 @@ final class DMGUpdateInstaller: UpdateInstalling {
             return "the app is not running from an installed .app bundle"
         }
         if url.path.contains("/AppTranslocation/") {
-            return "macOS is running a translocated copy; drag WinterVoice to Applications first"
+            return "macOS is running a translocated copy; drag MacVoice to Applications first"
         }
         guard fileManager.isWritableFile(atPath: url.deletingLastPathComponent().path),
               fileManager.isWritableFile(atPath: url.path)

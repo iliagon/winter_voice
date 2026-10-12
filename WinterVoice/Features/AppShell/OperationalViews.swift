@@ -29,7 +29,7 @@ struct OverviewView: View {
                             Text("Permissions need attention")
                                 .font(.wvHeadline)
                                 .foregroundStyle(Theme.warning)
-                            Text("WinterVoice needs Microphone, Input Monitoring, and Accessibility for audio capture, the global hotkey, and safe insertion.")
+                            Text("MacVoice needs Microphone, Input Monitoring, and Accessibility for audio capture, the global hotkey, and safe insertion.")
                                 .font(.wvBody)
                                 .foregroundStyle(Theme.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true)

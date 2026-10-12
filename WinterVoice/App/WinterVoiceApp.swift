@@ -13,7 +13,7 @@ struct WinterVoiceApp: App {
     }
 
     var body: some Scene {
-        Window("WinterVoice", id: "main") {
+        Window("MacVoice", id: "main") {
             LaunchGateView(
                 onboardingPresenter: container.onboardingPresenter,
                 shellPresenter: container.shellPresenter
@@ -26,7 +26,7 @@ struct WinterVoiceApp: App {
             WinterVoiceCommands()
         }
 
-        MenuBarExtra("WinterVoice", image: "MenuBarIcon") {
+        MenuBarExtra("MacVoice", image: "MenuBarIcon") {
             MenuBarView(
                 presenter: container.presenter,
                 shellPresenter: container.shellPresenter,
@@ -46,7 +46,7 @@ private struct WinterVoiceCommands: Commands {
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
-            Button("Open WinterVoice") {
+            Button("Open MacVoice") {
                 NSApplication.shared.activate(ignoringOtherApps: true)
                 openWindow(id: "main")
             }

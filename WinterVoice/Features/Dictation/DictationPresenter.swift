@@ -185,10 +185,10 @@ final class DictationPresenter: ObservableObject {
     }
 
     private func inputMonitoringRegistrationFeedback() -> String {
-        "macOS still reports Input Monitoring as not authorized for this running WinterVoice copy. A request may not show another prompt after denial. Open System Settings to inspect the matching entry; enable it only if this copy is listed. If no WinterVoice entry appears, close other copies and relaunch this copy before trying again."
+        "macOS still reports Input Monitoring as not authorized for this running MacVoice copy. A request may not show another prompt after denial. Open System Settings to inspect the matching entry; enable it only if this copy is listed. If no MacVoice entry appears, close other copies and relaunch this copy before trying again."
     }
 
     private func accessibilityRegistrationFeedback() -> String {
-        "macOS still reports Accessibility as not authorized for this running WinterVoice copy. Open System Settings to inspect the matching entry; enable it only if this copy is listed. If no WinterVoice entry appears, close other copies and relaunch this copy before trying again."
+        "macOS still reports Accessibility as not authorized for this running MacVoice copy. Open System Settings to inspect the matching entry; enable it only if this copy is listed. If no MacVoice entry appears, close other copies and relaunch this copy before trying again."
     }
 }

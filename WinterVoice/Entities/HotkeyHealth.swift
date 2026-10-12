@@ -252,11 +252,11 @@ enum HotkeyHealth: Equatable, Sendable {
     func detail(binding: HotkeyBinding, mode: RecordingMode = .holdToTalk) -> String {
         switch self {
         case .permissionRequired:
-            "Allow WinterVoice in Privacy & Security → Input Monitoring, then return to WinterVoice."
+            "Allow MacVoice in Privacy & Security → Input Monitoring, then return to MacVoice."
         case .listening:
             mode.instruction(binding: binding)
         case .installationFailed:
-            "WinterVoice could not install or recover its global hotkey listener. Return to the app to retry."
+            "MacVoice could not install or recover its global hotkey listener. Return to the app to retry."
         }
     }
 }

@@ -54,7 +54,7 @@ struct RecordingPanelView: View {
             case .labeled:
                 HStack(spacing: 7) {
                     WVBrandMark(size: 17)
-                    Text("WinterVoice")
+                    Text("MacVoice")
                         .font(.wv(11, .semibold))
                         .foregroundStyle(.white)
                 }

@@ -78,7 +78,7 @@ final class WidgetSnapshotTests: XCTestCase {
 
         relay.publish(.failed(DictationFailure(
             message: "The remote provider returned an invalid response.",
-            recovery: "Open Settings and allow WinterVoice in Privacy & Security → Accessibility."
+            recovery: "Open Settings and allow MacVoice in Privacy & Security → Accessibility."
         )))
         try snap("error-shipped-wide", style: .labeled)
     }

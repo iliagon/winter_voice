@@ -1,6 +1,6 @@
 import Foundation
 
-/// A newer release of WinterVoice on GitHub, ready to present to the user.
+/// A newer release of MacVoice on GitHub, ready to present to the user.
 struct AvailableUpdate: Equatable, Sendable {
     /// Normalized version without the tag's leading "v", e.g. "0.4.0".
     let version: String

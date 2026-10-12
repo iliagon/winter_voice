@@ -14,8 +14,8 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "05083E8C650FB575F38BE58074DB8493"
-               BuildableName = "WinterVoice.app"
+               BlueprintIdentifier = "5E56018BB168B30296A74BDEB1E20F48"
+               BuildableName = "MacVoice.app"
                BlueprintName = "WinterVoice"
                ReferencedContainer = "container:WinterVoice.xcodeproj">
             </BuildableReference>
@@ -44,8 +44,8 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "05083E8C650FB575F38BE58074DB8493"
-            BuildableName = "WinterVoice.app"
+            BlueprintIdentifier = "5E56018BB168B30296A74BDEB1E20F48"
+            BuildableName = "MacVoice.app"
             BlueprintName = "WinterVoice"
             ReferencedContainer = "container:WinterVoice.xcodeproj">
          </BuildableReference>
@@ -77,8 +77,8 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "05083E8C650FB575F38BE58074DB8493"
-            BuildableName = "WinterVoice.app"
+            BlueprintIdentifier = "5E56018BB168B30296A74BDEB1E20F48"
+            BuildableName = "MacVoice.app"
             BlueprintName = "WinterVoice"
             ReferencedContainer = "container:WinterVoice.xcodeproj">
          </BuildableReference>
@@ -94,8 +94,8 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "05083E8C650FB575F38BE58074DB8493"
-            BuildableName = "WinterVoice.app"
+            BlueprintIdentifier = "5E56018BB168B30296A74BDEB1E20F48"
+            BuildableName = "MacVoice.app"
             BlueprintName = "WinterVoice"
             ReferencedContainer = "container:WinterVoice.xcodeproj">
          </BuildableReference>

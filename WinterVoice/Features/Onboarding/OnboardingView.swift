@@ -48,7 +48,7 @@ struct OnboardingView: View {
         HStack(alignment: .center, spacing: 12) {
             WVBrandMark(size: 36)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Set up WinterVoice")
+                Text("Set up MacVoice")
                     .font(.wv(21, .semibold))
                     .foregroundStyle(Theme.textPrimary)
                 Text("Three permissions, then your voice types everywhere.")
@@ -171,7 +171,7 @@ struct OnboardingView: View {
                 Spacer()
                 Button("Refresh Status") { presenter.refresh() }
                     .buttonStyle(.wvSecondary)
-                Button(presenter.isLastPage ? "Start Using WinterVoice" : "Next") { presenter.next() }
+                Button(presenter.isLastPage ? "Start Using MacVoice" : "Next") { presenter.next() }
                     .buttonStyle(.wvPrimary)
                     .disabled(presenter.isLastPage && presenter.progress != .ready)
             }
@@ -186,17 +186,17 @@ struct OnboardingView: View {
         switch permission {
         case .inputMonitoring:
             if status == .notDetermined {
-                return "Request access and approve the macOS prompt. Return to WinterVoice; the status rechecks automatically."
+                return "Request access and approve the macOS prompt. Return to MacVoice; the status rechecks automatically."
             }
-            return "macOS never shows the Input Monitoring prompt again after a denial. Open System Settings and turn on WinterVoice in the Input Monitoring list. If no entry appears, close other copies and relaunch this copy. Return to WinterVoice; the status rechecks automatically."
+            return "macOS never shows the Input Monitoring prompt again after a denial. Open System Settings and turn on MacVoice in the Input Monitoring list. If no entry appears, close other copies and relaunch this copy. Return to MacVoice; the status rechecks automatically."
         case .accessibility:
             return status == .notDetermined
-                ? "Request access and approve the macOS prompt. Return to WinterVoice; the status rechecks automatically."
-                : "macOS never re-prompts after a denial. Open System Settings and turn on WinterVoice in the Accessibility list. If no entry appears, close other copies and relaunch this copy. Return to WinterVoice; the status rechecks automatically."
+                ? "Request access and approve the macOS prompt. Return to MacVoice; the status rechecks automatically."
+                : "macOS never re-prompts after a denial. Open System Settings and turn on MacVoice in the Accessibility list. If no entry appears, close other copies and relaunch this copy. Return to MacVoice; the status rechecks automatically."
         case .microphone:
             return status == .notDetermined
                 ? "macOS will show the Microphone privacy prompt."
-                : "macOS never re-prompts after a denial. Open System Settings and enable WinterVoice under Microphone."
+                : "macOS never re-prompts after a denial. Open System Settings and enable MacVoice under Microphone."
         }
     }
 

@@ -76,7 +76,7 @@ final class AppContainer {
             preferences: behaviorPreferences
         )
         let router = AppRouter()
-        // Dev affordance: `open WinterVoice.app --args -WVOpenPage settings`
+        // Dev affordance: `open MacVoice.app --args -WVOpenPage settings`
         // jumps straight to a shell page on launch.
         let arguments = ProcessInfo.processInfo.arguments
         if let flagIndex = arguments.firstIndex(of: "-WVOpenPage"),

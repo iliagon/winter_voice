@@ -112,7 +112,7 @@ final class SystemPasteboardSession: PasteboardSession {
     private let pasteboard: NSPasteboard = .general
     // De-facto standard markings honored by clipboard managers (Maccy, Paste,
     // Raycast, …): without them the dictated text survives in their history
-    // even after WinterVoice restores the pasteboard.
+    // even after MacVoice restores the pasteboard.
     private static let concealedType = NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")
     private static let transientType = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
 
@@ -302,7 +302,7 @@ final class SystemTextInjector: TextInjecting {
             throw error
         }
 
-        // Restore only if nobody changed the clipboard after WinterVoice wrote it.
+        // Restore only if nobody changed the clipboard after MacVoice wrote it.
         restore(priorItems, ifChangeCountIs: winterVoiceChangeCount)
     }
 

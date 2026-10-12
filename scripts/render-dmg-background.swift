@@ -132,7 +132,7 @@ func drawCentered(_ text: NSAttributedString, centerX: CGFloat, topY: CGFloat) {
 }
 
 // Brand header: waveform mark beside the wordmark, tagline underneath.
-let wordmark = attributedText("WinterVoice", size: 24, weight: .bold, alpha: 0.95, kern: 0.3)
+let wordmark = attributedText("MacVoice", size: 24, weight: .bold, alpha: 0.95, kern: 0.3)
 let waveWeights: [CGFloat] = [0.45, 0.7, 1.0, 1.2, 1.0, 0.7, 0.45]
 let waveBarWidth: CGFloat = 3.5
 let waveSpacing: CGFloat = 3.5
@@ -257,7 +257,7 @@ head.stroke()
 
 // Bottom brand strip: letterspaced name over a gradient hairline.
 drawCentered(
-    attributedText("WINTERVOICE", size: 9, weight: .semibold, alpha: 0.35, kern: 4),
+    attributedText("MACVOICE", size: 9, weight: .semibold, alpha: 0.35, kern: 4),
     centerX: 330, topY: 348
 )
 let hairline = NSBezierPath(

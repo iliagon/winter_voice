@@ -18,7 +18,7 @@ struct DictionaryView: View {
         WVPage(
             icon: "character.book.closed",
             title: "Dictionary",
-            subtitle: "Fix words WinterVoice gets wrong."
+            subtitle: "Fix words MacVoice gets wrong."
         ) {
             savedTermsCard
         } trailing: {
@@ -168,7 +168,7 @@ private struct DictionaryTermSheet: View {
             Text(isEditing ? "Edit Term" : "Add Term")
                 .font(.wvTitle)
                 .foregroundStyle(Theme.textPrimary)
-            WVField(label: "Word or phrase WinterVoice hears") {
+            WVField(label: "Word or phrase MacVoice hears") {
                 TextField("", text: $source).textFieldStyle(.wv)
             }
             WVField(label: "What it should type instead") {

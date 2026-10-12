@@ -168,7 +168,7 @@ struct WVSidebar: View {
             case .installing:
                 ProgressView()
                     .controlSize(.small)
-                Text("Installing… WinterVoice will relaunch in a moment.")
+                Text("Installing… MacVoice will relaunch in a moment.")
                     .font(.wv(11))
                     .foregroundStyle(Theme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -201,7 +201,7 @@ struct WVSidebar: View {
 
     private var bannerTitle: String {
         switch updates.state {
-        case .downloading: "Updating WinterVoice"
+        case .downloading: "Updating MacVoice"
         case .installing: "Almost there"
         case .installFailed: "Automatic update failed"
         default: "New version available"
@@ -286,7 +286,7 @@ struct WVSidebar: View {
             HStack(spacing: 10) {
                 avatar
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("WinterVoice")
+                    Text("MacVoice")
                         .font(.wv(13, .medium))
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)

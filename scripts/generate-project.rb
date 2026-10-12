@@ -11,6 +11,9 @@ project.root_object.attributes['LastUpgradeCheck'] = '2650'
 
 app = project.new_target(:application, 'WinterVoice', :osx, '14.0')
 tests = project.new_target(:unit_test_bundle, 'WinterVoiceTests', :osx, '14.0')
+# Match the product reference (and the scheme's BuildableName derived from
+# it) to PRODUCT_NAME below.
+app.product_reference.path = 'MacVoice.app'
 
 # Pinned upstream whisper.cpp XCFramework wrapped as a local Swift package.
 whisper_package = project.new(Xcodeproj::Project::Object::XCLocalSwiftPackageReference)
@@ -48,7 +51,11 @@ end
 
 app.build_configurations.each do |config|
   config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.winterzxzz.WinterVoice'
-  config.build_settings['PRODUCT_NAME'] = '$(TARGET_NAME)'
+  # The shipped app is MacVoice.app; the target, Swift module, and bundle
+  # identifier keep the WinterVoice name so existing installs keep their
+  # permissions, data, and update path.
+  config.build_settings['PRODUCT_NAME'] = 'MacVoice'
+  config.build_settings['PRODUCT_MODULE_NAME'] = 'WinterVoice'
   config.build_settings['GENERATE_INFOPLIST_FILE'] = 'NO'
   config.build_settings['INFOPLIST_FILE'] = 'WinterVoice/Resources/Info.plist'
   config.build_settings['ASSETCATALOG_COMPILER_APPICON_NAME'] = 'AppIcon'
@@ -68,7 +75,7 @@ tests.build_configurations.each do |config|
   config.build_settings['GENERATE_INFOPLIST_FILE'] = 'YES'
   config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = '14.0'
   config.build_settings['SWIFT_VERSION'] = '6.0'
-  config.build_settings['TEST_HOST'] = '$(BUILT_PRODUCTS_DIR)/WinterVoice.app/Contents/MacOS/WinterVoice'
+  config.build_settings['TEST_HOST'] = '$(BUILT_PRODUCTS_DIR)/MacVoice.app/Contents/MacOS/MacVoice'
   config.build_settings['BUNDLE_LOADER'] = '$(TEST_HOST)'
 end
 

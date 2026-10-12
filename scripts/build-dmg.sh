@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds a Release WinterVoice.app and packages it as build/WinterVoice.dmg
+# Builds a Release MacVoice.app and packages it as build/MacVoice.dmg
 # with a drag-to-Applications layout. The app is ad-hoc signed; distribution
 # signing and notarization are roadmap work (see docs/DEVELOPMENT.md).
 set -euo pipefail
@@ -7,8 +7,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 DERIVED_DATA="build/DerivedData-Release"
-DMG_PATH="build/WinterVoice.dmg"
-VOLUME_NAME="WinterVoice"
+DMG_PATH="build/MacVoice.dmg"
+VOLUME_NAME="MacVoice"
 
 # Start from a clean products dir: an earlier scheme-based build embeds
 # XCTest frameworks and the test bundle into the app, which must not ship.
@@ -25,7 +25,7 @@ xcodebuild \
   CODE_SIGNING_ALLOWED=NO \
   build
 
-APP_PATH="$DERIVED_DATA/Build/Products/Release/WinterVoice.app"
+APP_PATH="$DERIVED_DATA/Build/Products/Release/MacVoice.app"
 if [[ ! -d "$APP_PATH" ]]; then
   echo "error: expected app bundle at $APP_PATH" >&2
   exit 1
@@ -56,7 +56,7 @@ touch "$STAGING_DIR/.fseventsd/no_log"
 # Style the installer window on a writable image, then compress. Finder
 # scripting stores the layout in the volume's .DS_Store; the first run on a
 # machine prompts once for Automation permission over Finder.
-RW_DMG="build/WinterVoice-rw.dmg"
+RW_DMG="build/MacVoice-rw.dmg"
 rm -f "$DMG_PATH" "$RW_DMG"
 hdiutil create \
   -volname "$VOLUME_NAME" \
@@ -64,7 +64,7 @@ hdiutil create \
   -ov -format UDRW \
   "$RW_DMG"
 
-# A stale mounted volume makes the fresh image mount as "WinterVoice 1"
+# A stale mounted volume makes the fresh image mount as "MacVoice 1"
 # and the Finder styling hits the wrong disk — eject leftovers first, then
 # take the mount point hdiutil actually reports.
 MOUNT_POINT="/Volumes/$VOLUME_NAME"
@@ -94,7 +94,7 @@ tell application "Finder"
     set icon size of viewOptions to 100
     set text size of viewOptions to 12
     set background picture of viewOptions to file ".background:background.png"
-    set position of item "WinterVoice.app" of container window to {165, 192}
+    set position of item "MacVoice.app" of container window to {165, 192}
     set position of item "Applications" of container window to {495, 192}
     -- Park the helper entries far below the window so they stay out of
     -- sight even when the user browses with hidden files visible. Finder

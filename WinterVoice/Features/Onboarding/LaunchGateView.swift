@@ -72,7 +72,7 @@ private struct SplashView: View {
                     .opacity(showMark ? 1 : 0)
 
                 VStack(spacing: 8) {
-                    Text("WinterVoice")
+                    Text("MacVoice")
                         .font(.wv(30, .semibold))
                         .tracking(-0.5)
                         .foregroundStyle(Theme.textPrimary)

@@ -551,7 +551,7 @@ struct AppSettingsView: View {
         sectionCard("Behavior") {
             settingRow(
                 title: "Launch at login",
-                caption: "Start WinterVoice automatically when you log in, ready in the menu bar."
+                caption: "Start MacVoice automatically when you log in, ready in the menu bar."
             ) {
                 Toggle("", isOn: $launchAtLogin.isEnabled)
                     .toggleStyle(.wv)
@@ -696,7 +696,7 @@ struct AppSettingsView: View {
         case .labeled:
             HStack(spacing: 6) {
                 WVBrandMark(size: 15)
-                Text("WinterVoice")
+                Text("MacVoice")
                     .font(.wv(11.5, .semibold))
                     .foregroundStyle(.white)
             }
@@ -830,7 +830,7 @@ struct AppSettingsView: View {
             }
         }) {
             settingRow(
-                title: "WinterVoice v\(updates.currentVersion)",
+                title: "MacVoice v\(updates.currentVersion)",
                 caption: updateCaption
             ) {
                 switch updates.state {
@@ -859,7 +859,7 @@ struct AppSettingsView: View {
         case .upToDate: "You're on the latest version."
         case .available(let update): "Version \(update.version) is ready to install."
         case .downloading(let update, _): "Downloading version \(update.version)…"
-        case .installing: "Installing… WinterVoice will relaunch in a moment."
+        case .installing: "Installing… MacVoice will relaunch in a moment."
         case .installFailed(_, let message): message
         case .failed(let message): message
         }
@@ -906,7 +906,7 @@ struct AppSettingsView: View {
                         .foregroundStyle(Theme.textSecondary)
                 }
             case .installing:
-                ProgressView("Installing… WinterVoice will relaunch in a moment.")
+                ProgressView("Installing… MacVoice will relaunch in a moment.")
                     .controlSize(.small)
             case .installFailed:
                 HStack(spacing: 10) {
@@ -1049,10 +1049,10 @@ struct SettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("WinterVoice")
+                    Text("MacVoice")
                         .font(.wvTitle)
                         .foregroundStyle(Theme.textPrimary)
-                    Text("Configure permissions here. Transcription, shortcuts, and the widget are managed in the main WinterVoice window.")
+                    Text("Configure permissions here. Transcription, shortcuts, and the widget are managed in the main MacVoice window.")
                         .font(.wvBody)
                         .foregroundStyle(Theme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)

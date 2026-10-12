@@ -94,7 +94,7 @@ private struct TitlebarBrand: View {
             HStack(spacing: 8) {
                 WVBrandMark(size: 19)
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("WinterVoice")
+                    Text("MacVoice")
                         .font(.wv(13.5, .semibold))
                         .foregroundStyle(Theme.textPrimary)
                     Text("v\(appVersion)")
@@ -138,7 +138,7 @@ private struct SidebarToggleButton: View {
 }
 
 extension View {
-    /// Apply the WinterVoice window chrome to the hosting window.
+    /// Apply the MacVoice window chrome to the hosting window.
     func wvWindowChrome() -> some View {
         background(WindowConfigurator())
     }

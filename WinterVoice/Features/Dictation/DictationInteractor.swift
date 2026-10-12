@@ -125,7 +125,7 @@ final class DictationInteractor: DictationInteracting {
                 guard permissions.snapshot().accessibility == .authorized else {
                     throw DictationFailure(
                         message: "Accessibility permission is required.",
-                        recovery: "Open Settings and allow WinterVoice in Privacy & Security → Accessibility."
+                        recovery: "Open Settings and allow MacVoice in Privacy & Security → Accessibility."
                     )
                 }
                 if target == nil { target = try injector.captureTarget() }
@@ -190,7 +190,7 @@ final class DictationInteractor: DictationInteracting {
         guard status == .authorized else {
             throw DictationFailure(
                 message: "\(permission.title) permission is required.",
-                recovery: "Open WinterVoice Settings to grant access."
+                recovery: "Open MacVoice Settings to grant access."
             )
         }
     }

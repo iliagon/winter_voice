@@ -10,7 +10,7 @@ import XCTest
 ///
 /// `insert` always runs `activateAndVerify`, whose nil-element branch consults
 /// the REAL frontmost application and live AX focus state — neither is
-/// reachable through the initializer's seams. The test host is WinterVoice.app
+/// reachable through the initializer's seams. The test host is MacVoice.app
 /// itself (an LSUIElement accessory), which cannot reliably become frontmost,
 /// so a target built from `NSRunningApplication.current` would fail the
 /// frontmost-pid check on most machines. Tests instead aim the captured target

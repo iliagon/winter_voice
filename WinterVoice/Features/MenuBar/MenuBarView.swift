@@ -28,7 +28,7 @@ struct MenuBarView: View {
 
         Divider()
 
-        Button("Open WinterVoice") {
+        Button("Open MacVoice") {
             openMainWindow()
         }
         .keyboardShortcut("0", modifiers: .command)
@@ -49,13 +49,13 @@ struct MenuBarView: View {
 
         Divider()
 
-        Button("Quit WinterVoice") { presenter.quit() }
+        Button("Quit MacVoice") { presenter.quit() }
             .keyboardShortcut("q")
     }
 
     private var updateMenuTitle: String {
         if shellPresenter.updates.state.isInstallBusy {
-            return "Updating WinterVoice…"
+            return "Updating MacVoice…"
         }
         if case .available(let update) = shellPresenter.updates.state {
             return "Update Available: v\(update.version)…"

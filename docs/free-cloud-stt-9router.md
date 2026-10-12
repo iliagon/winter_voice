@@ -2,7 +2,7 @@
 
 *[Tiếng Việt bên dưới ↓](#nhận-dạng-cloud-miễn-phí-với-9router)*
 
-WinterVoice's **Local mode** is already free and 100% offline. If you want **faster transcription** without paying either, route WinterVoice through [9router](https://9router.com) — a local OpenAI-compatible API router — to a provider with a free speech-to-text tier such as **Groq's `whisper-large-v3-turbo`**.
+MacVoice's **Local mode** is already free and 100% offline. If you want **faster transcription** without paying either, route MacVoice through [9router](https://9router.com) — a local OpenAI-compatible API router — to a provider with a free speech-to-text tier such as **Groq's `whisper-large-v3-turbo`**.
 
 Audio leaves your Mac in this mode (it goes to the provider you pick). Stay on Local mode if that matters to you.
 
@@ -18,9 +18,9 @@ Audio leaves your Mac in this mode (it goes to the provider you pick). Stay on L
 3. Add your provider (e.g. **Groq**) and paste its API key
 4. Note the model id 9router exposes, e.g. `groq/whisper-large-v3-turbo`
 
-## Point WinterVoice at it
+## Point MacVoice at it
 
-1. WinterVoice → **Settings → Transcription** → switch to **Remote**
+1. MacVoice → **Settings → Transcription** → switch to **Remote**
 2. Fill in:
    - **Base URL:** `http://localhost:20128/v1`
    - **Model:** `groq/whisper-large-v3-turbo`
@@ -28,7 +28,7 @@ Audio leaves your Mac in this mode (it goes to the provider you pick). Stay on L
    - **Language:** pick your language or leave **Auto**
 3. Press **Test Connection**, then **Save Configuration**
 
-> WinterVoice normally requires HTTPS, but plain HTTP is explicitly allowed for `localhost` — a local router is exactly the case this exception exists for.
+> MacVoice normally requires HTTPS, but plain HTTP is explicitly allowed for `localhost` — a local router is exactly the case this exception exists for.
 
 ## Troubleshooting
 
@@ -43,7 +43,7 @@ Audio leaves your Mac in this mode (it goes to the provider you pick). Stay on L
 
 # Nhận dạng cloud miễn phí với 9router
 
-Chế độ **Local** của WinterVoice vốn đã miễn phí và chạy 100% offline. Nếu muốn **nhận dạng nhanh hơn** mà vẫn không tốn tiền, hãy cho WinterVoice đi qua [9router](https://9router.com) — một router API chuẩn OpenAI chạy ngay trên máy — tới nhà cung cấp có gói STT miễn phí, ví dụ **Groq `whisper-large-v3-turbo`**.
+Chế độ **Local** của MacVoice vốn đã miễn phí và chạy 100% offline. Nếu muốn **nhận dạng nhanh hơn** mà vẫn không tốn tiền, hãy cho MacVoice đi qua [9router](https://9router.com) — một router API chuẩn OpenAI chạy ngay trên máy — tới nhà cung cấp có gói STT miễn phí, ví dụ **Groq `whisper-large-v3-turbo`**.
 
 Ở chế độ này âm thanh sẽ rời khỏi máy (đi tới nhà cung cấp bạn chọn). Nếu điều đó quan trọng với bạn, cứ dùng Local.
 
@@ -59,9 +59,9 @@ Chế độ **Local** của WinterVoice vốn đã miễn phí và chạy 100% o
 3. Thêm nhà cung cấp (ví dụ **Groq**) và dán API key của họ
 4. Ghi lại model id mà 9router expose, ví dụ `groq/whisper-large-v3-turbo`
 
-## Trỏ WinterVoice vào 9router
+## Trỏ MacVoice vào 9router
 
-1. WinterVoice → **Settings → Transcription** → chuyển sang **Remote**
+1. MacVoice → **Settings → Transcription** → chuyển sang **Remote**
 2. Điền:
    - **Base URL:** `http://localhost:20128/v1`
    - **Model:** `groq/whisper-large-v3-turbo`
@@ -69,7 +69,7 @@ Chế độ **Local** của WinterVoice vốn đã miễn phí và chạy 100% o
    - **Language:** chọn tiếng Việt hoặc để **Auto**
 3. Bấm **Test Connection**, rồi **Save Configuration**
 
-> WinterVoice bình thường bắt buộc HTTPS, nhưng HTTP thuần được phép riêng cho `localhost` — router chạy local chính là trường hợp ngoại lệ này sinh ra để phục vụ.
+> MacVoice bình thường bắt buộc HTTPS, nhưng HTTP thuần được phép riêng cho `localhost` — router chạy local chính là trường hợp ngoại lệ này sinh ra để phục vụ.
 
 ## Lỗi thường gặp
 

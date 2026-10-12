@@ -51,7 +51,7 @@ actor WhisperContextActor: LocalTranscriptionRunning {
         guard audio.sampleRate == 16_000 else {
             throw DictationFailure(
                 message: "Local transcription received unsupported audio.",
-                recovery: "WinterVoice expects mono 16 kHz audio for whisper.cpp."
+                recovery: "MacVoice expects mono 16 kHz audio for whisper.cpp."
             )
         }
         guard !audio.samples.isEmpty else {
