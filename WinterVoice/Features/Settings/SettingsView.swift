@@ -59,7 +59,7 @@ struct AppSettingsView: View {
                 filled: true
             )
         }) {
-            Text("Audio is sent only to the OpenAI-compatible endpoint you configure below.")
+            Text("Audio is sent only to the provider you configure below.")
                 .font(.wvCaption)
                 .foregroundStyle(Theme.textSecondary)
 
@@ -87,7 +87,8 @@ struct AppSettingsView: View {
     }
 
     private var languageCaption: String {
-        configuration.languageCode == nil
+        if configuration.remote.kind == .chatGPTWeb { return "ChatGPT detects the language itself; this is not sent." }
+        return configuration.languageCode == nil
             ? "Auto-detect finds the spoken language for you."
             : "Sent to the endpoint with every request."
     }
@@ -130,29 +131,51 @@ struct AppSettingsView: View {
 
     @ViewBuilder
     private var remoteRows: some View {
+        let isChatGPT = controller.kind == .chatGPTWeb
         VStack(alignment: .leading, spacing: 12) {
-            WVField(label: "Base URL") {
-                TextField("", text: $controller.baseURL, prompt: Text("https://host.example/v1"))
-                    .textFieldStyle(.wv)
+            WVField(label: "Provider") {
+                WVChipPicker(
+                    selection: $controller.kind,
+                    options: RemoteProviderKind.allCases,
+                    label: { $0.title },
+                    grouped: true
+                )
             }
-            WVField(label: "Model") {
-                TextField("", text: $controller.remoteModel).textFieldStyle(.wv)
-            }
-            WVField(label: configuration.hasAPIKey ? "API key (saved)" : "API key (optional)") {
-                SecureField("", text: $controller.apiKey).textFieldStyle(.wv)
+            if isChatGPT {
+                WVField(label: configuration.hasAPIKey ? "Access token (saved)" : "Access token") {
+                    SecureField("", text: $controller.apiKey, prompt: Text("eyJ…")).textFieldStyle(.wv)
+                }
+            } else {
+                WVField(label: "Base URL") {
+                    TextField("", text: $controller.baseURL, prompt: Text("https://host.example/v1"))
+                        .textFieldStyle(.wv)
+                }
+                WVField(label: "Model") {
+                    TextField("", text: $controller.remoteModel).textFieldStyle(.wv)
+                }
+                WVField(label: configuration.hasAPIKey ? "API key (saved)" : "API key (optional)") {
+                    SecureField("", text: $controller.apiKey).textFieldStyle(.wv)
+                }
             }
             HStack(spacing: 10) {
                 Button("Save Configuration") { controller.saveRemote() }.buttonStyle(.wvPrimary)
                 Button("Test Connection") { controller.testRemoteConnection() }.buttonStyle(.wvSecondary)
                 if configuration.hasAPIKey {
-                    Button("Use Without Authentication", role: .destructive) { controller.removeAPIKey() }
-                        .buttonStyle(.wvGhost(role: .destructive))
+                    Button(isChatGPT ? "Remove Token" : "Use Without Authentication", role: .destructive) {
+                        controller.removeAPIKey()
+                    }
+                    .buttonStyle(.wvGhost(role: .destructive))
                 }
             }
             if let remoteResult = controller.remoteResult {
                 Text(remoteResult).font(.wvCaption).foregroundStyle(Theme.textSecondary)
             }
-            Text("HTTPS is required except for localhost or a private LAN endpoint. The API key is stored locally in Application Support with owner-only file permissions. Test Connection probes the draft above without saving it.")
+            if isChatGPT, configuration.remote.kind == .chatGPTWeb {
+                Text(status.readiness.detail).font(.wvCaption).foregroundStyle(Theme.textSecondary)
+            }
+            Text(isChatGPT
+                ? "Uses ChatGPT's own dictation endpoint with your account. Sign in at chatgpt.com, open chatgpt.com/api/auth/session and copy the accessToken value. It expires after about ten days and is stored locally in Application Support with owner-only file permissions."
+                : "HTTPS is required except for localhost or a private LAN endpoint. The API key is stored locally in Application Support with owner-only file permissions. Test Connection probes the draft above without saving it.")
                 .font(.wvCaption)
                 .foregroundStyle(Theme.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)

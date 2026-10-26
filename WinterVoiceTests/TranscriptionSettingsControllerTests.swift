@@ -111,6 +111,33 @@ final class TranscriptionSettingsControllerTests: XCTestCase {
         XCTAssertTrue(result.hasPrefix("Connected successfully"), "Unexpected result: \(result)")
         XCTAssertNotEqual(result, "Configuration saved.", "A successful probe must not read as a completed save")
     }
+
+    func testChatGPTSaveStripsBearerPrefixAndRejectsNonTokens() throws {
+        let suite = "TranscriptionSettingsControllerTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let credentials = CredentialStoreSpy()
+        let store = ProviderConfigurationStore(defaults: defaults, credentials: credentials)
+        let tester = ConnectionTesterSpy()
+        let subject = TranscriptionSettingsController(configuration: store, connectionTester: tester)
+        subject.kind = .chatGPTWeb
+
+        subject.apiKey = "sk-openai-key"
+        subject.saveRemote()
+        XCTAssertEqual(subject.remoteResult, "That is not a ChatGPT access token.")
+        XCTAssertNil(credentials.value)
+        XCTAssertEqual(store.remote.kind, .openAICompatible, "A rejected token must not switch the saved provider")
+        subject.testRemoteConnection()
+        XCTAssertEqual(subject.remoteResult, "That is not a ChatGPT access token.")
+        XCTAssertTrue(tester.requests.isEmpty)
+
+        let token = "eyJhbGciOiJSUzI1NiJ9.eyJleHAiOjIwMDAwMDAwMDB9.sig"
+        subject.apiKey = "Bearer \(token)"
+        subject.saveRemote()
+        XCTAssertEqual(subject.remoteResult, "Configuration saved.")
+        XCTAssertEqual(credentials.value, token)
+        XCTAssertEqual(store.remote.kind, .chatGPTWeb)
+    }
 }
 
 private let savedConfiguration = RemoteProviderConfiguration(
