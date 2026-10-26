@@ -354,6 +354,129 @@ final class RemoteProviderTests: XCTestCase {
         let request = try XCTUnwrap(capturedRequest)
         XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
     }
+
+    // MARK: ChatGPT web
+
+    func testChatGPTAccessTokenParsesClaimsAndRejectsOtherCredentials() throws {
+        let raw = fakeChatGPTToken(accountID: "1ec977dd-e89a-4e49", expiresAt: 2_000_000_000)
+        let token = try XCTUnwrap(ChatGPTAccessToken("  Bearer \(raw)\n"))
+        XCTAssertEqual(token.value, raw)
+        XCTAssertEqual(token.accountID, "1ec977dd-e89a-4e49")
+        XCTAssertEqual(token.expiresAt, Date(timeIntervalSince1970: 2_000_000_000))
+        XCTAssertFalse(token.isExpired(at: Date(timeIntervalSince1970: 1_999_999_999)))
+        XCTAssertTrue(token.isExpired(at: Date(timeIntervalSince1970: 2_000_000_000)))
+
+        XCTAssertNil(ChatGPTAccessToken("sk-proj-abc"))
+        XCTAssertNil(ChatGPTAccessToken("a.b.c"), "The payload must be JSON")
+        XCTAssertNil(ChatGPTAccessToken(raw + "\r\nX-Injected: 1"))
+        let injectedAccount = try XCTUnwrap(ChatGPTAccessToken(fakeChatGPTToken(accountID: "id\r\nX-Injected: 1", expiresAt: 1)))
+        XCTAssertNil(injectedAccount.accountID, "Only a plain id may become a header value")
+    }
+
+    func testChatGPTRequestMatchesWebDictationForm() async throws {
+        let transport = RemoteTransportSpy(status: 200, body: #"{"text":"Ça marche, ça marche.","asset_pointer":"sediment://x","asset_ttl":"30d","asset_format":"wav"}"#)
+        let token = fakeChatGPTToken(accountID: "acc-1", expiresAt: 2_000_000_000)
+
+        let text = try await RemoteTranscriptionProvider(transport: transport).transcribe(
+            audio: .init(samples: [Float](repeating: 0, count: 8_000), sampleRate: 16_000),
+            configuration: .init(kind: .chatGPTWeb, baseURL: "https://ignored.example", model: ""),
+            language: "ru",
+            apiKey: token
+        )
+
+        XCTAssertEqual(text, "Ça marche, ça marche.")
+        let capturedRequest = await transport.request
+        let request = try XCTUnwrap(capturedRequest)
+        XCTAssertEqual(request.url, RemoteTranscriptionProvider.chatGPTEndpoint)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(token)")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "chatgpt-account-id"), "acc-1")
+        let body = String(decoding: try XCTUnwrap(request.httpBody), as: UTF8.self)
+        XCTAssertTrue(body.contains("name=\"dictation_session_id\""))
+        XCTAssertTrue(body.contains("name=\"attempt_id\""))
+        XCTAssertTrue(body.contains("name=\"duration_ms\"\r\n\r\n500.0\r\n"))
+        XCTAssertTrue(body.contains("name=\"file\"; filename=\"audio.wav\""))
+        XCTAssertFalse(body.contains("name=\"model\""))
+        XCTAssertFalse(body.contains("name=\"language\""), "The web form has no language field")
+    }
+
+    func testChatGPTRequestWithoutTokenFailsBeforeNetwork() async {
+        let transport = RemoteTransportSpy(status: 200, body: #"{"text":"x"}"#)
+        do {
+            _ = try await RemoteTranscriptionProvider(transport: transport).transcribe(
+                audio: .init(samples: [0], sampleRate: 16_000),
+                configuration: .init(kind: .chatGPTWeb),
+                language: nil,
+                apiKey: "sk-not-a-token"
+            )
+            XCTFail("Expected failure")
+        } catch let failure as DictationFailure {
+            XCTAssertEqual(failure.message, "Paste a ChatGPT access token.")
+        } catch { XCTFail("Unexpected error: \(error)") }
+        let request = await transport.request
+        XCTAssertNil(request)
+    }
+
+    func testChatGPTFailuresMapToTokenAndCloudflareMessages() async {
+        let token = fakeChatGPTToken(accountID: "acc", expiresAt: 2_000_000_000)
+        for (status, headers, expected) in [
+            (401, [String: String](), "ChatGPT rejected the access token."),
+            (403, ["cf-mitigated": "challenge"], "ChatGPT blocked the request with a Cloudflare challenge.")
+        ] {
+            let subject = RemoteTranscriptionProvider(transport: RemoteTransportSpy(status: status, body: "<html>", headers: headers))
+            do {
+                try await subject.testConnection(configuration: .init(kind: .chatGPTWeb), apiKey: token)
+                XCTFail("Expected failure")
+            } catch let failure as DictationFailure {
+                XCTAssertEqual(failure.message, expected)
+            } catch { XCTFail("Unexpected error: \(error)") }
+        }
+    }
+
+    func testLegacyConfigurationWithoutKindDecodesAsOpenAICompatible() throws {
+        let legacy = Data(#"{"baseURL":"https://host.example/v1","model":"m"}"#.utf8)
+        let decoded = try JSONDecoder().decode(RemoteProviderConfiguration.self, from: legacy)
+        XCTAssertEqual(decoded, RemoteProviderConfiguration(baseURL: "https://host.example/v1", model: "m"))
+        let roundTripped = try JSONDecoder().decode(
+            RemoteProviderConfiguration.self,
+            from: JSONEncoder().encode(RemoteProviderConfiguration(kind: .chatGPTWeb))
+        )
+        XCTAssertEqual(roundTripped.kind, .chatGPTWeb)
+    }
+
+    @MainActor
+    func testChatGPTReadinessTracksTokenPresenceShapeAndExpiry() throws {
+        let suite = "ChatGPTReadinessTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let credentials = CredentialStoreSpy()
+        var now = Date(timeIntervalSince1970: 1_000)
+        let store = ProviderConfigurationStore(defaults: defaults, credentials: credentials, now: { now })
+        try store.saveRemote(.init(kind: .chatGPTWeb), apiKey: nil)
+
+        XCTAssertEqual(store.readiness(), .unavailable("Paste a ChatGPT access token in Transcription settings."))
+        credentials.value = "sk-openai-key"
+        XCTAssertEqual(store.readiness(), .unavailable("The saved credential is not a ChatGPT access token."))
+        credentials.value = fakeChatGPTToken(accountID: "acc", expiresAt: 2_000)
+        XCTAssertTrue(store.readiness().isReady)
+        now = Date(timeIntervalSince1970: 2_000)
+        XCTAssertFalse(store.readiness().isReady)
+        XCTAssertTrue(store.readiness().detail.hasPrefix("The ChatGPT access token expired on"))
+    }
+}
+
+/// An unsigned JWT with the claims ChatGPT access tokens carry.
+private func fakeChatGPTToken(accountID: String, expiresAt: Int) -> String {
+    func segment(_ json: [String: Any]) -> String {
+        try! JSONSerialization.data(withJSONObject: json).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+    let payload: [String: Any] = [
+        "exp": expiresAt,
+        "https://api.openai.com/auth": ["chatgpt_account_id": accountID]
+    ]
+    return "\(segment(["alg": "RS256"])).\(segment(payload)).signature"
 }
 
 private enum TestFailure: Error { case expected }
@@ -386,16 +509,18 @@ private final class CredentialStoreSpy: CredentialStoring {
 private actor RemoteTransportSpy: RemoteTransport {
     let status: Int
     let body: String
+    let headers: [String: String]
     private(set) var request: URLRequest?
 
-    init(status: Int, body: String) {
+    init(status: Int, body: String, headers: [String: String] = [:]) {
         self.status = status
         self.body = body
+        self.headers = headers
     }
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         self.request = request
-        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: headers)!
         return (Data(body.utf8), response)
     }
 

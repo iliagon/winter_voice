@@ -1,8 +1,36 @@
 import Foundation
 
+enum RemoteProviderKind: String, Codable, CaseIterable, Sendable {
+    /// Any `/audio/transcriptions` endpoint speaking the OpenAI API shape.
+    case openAICompatible
+    /// ChatGPT's own dictation endpoint, authenticated with the web session's
+    /// access token pasted by the user (it expires after about ten days).
+    case chatGPTWeb
+
+    var title: String {
+        switch self {
+        case .openAICompatible: "OpenAI-compatible"
+        case .chatGPTWeb: "ChatGPT (access token)"
+        }
+    }
+}
+
 struct RemoteProviderConfiguration: Equatable, Codable, Sendable {
+    var kind: RemoteProviderKind = .openAICompatible
     var baseURL = ""
     var model = ""
+}
+
+extension RemoteProviderConfiguration {
+    private enum CodingKeys: String, CodingKey { case kind, baseURL, model }
+
+    /// Configurations saved before `kind` existed decode as OpenAI-compatible.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try container.decodeIfPresent(RemoteProviderKind.self, forKey: .kind) ?? .openAICompatible
+        baseURL = try container.decodeIfPresent(String.self, forKey: .baseURL) ?? ""
+        model = try container.decodeIfPresent(String.self, forKey: .model) ?? ""
+    }
 }
 
 enum ProviderReadiness: Equatable, Sendable {

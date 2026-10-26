@@ -23,6 +23,7 @@ final class RemoteConnectionTester: RemoteConnectionTesting {
 /// in view code.
 @MainActor
 final class TranscriptionSettingsController: ObservableObject {
+    @Published var kind: RemoteProviderKind = .openAICompatible
     @Published var baseURL = ""
     @Published var remoteModel = ""
     @Published var apiKey = ""
@@ -41,18 +42,31 @@ final class TranscriptionSettingsController: ObservableObject {
     }
 
     var draft: RemoteProviderConfiguration {
-        .init(baseURL: baseURL, model: remoteModel)
+        .init(kind: kind, baseURL: baseURL, model: remoteModel)
     }
 
     func loadRemoteDraft() {
+        kind = configuration.remote.kind
         baseURL = configuration.remote.baseURL
         remoteModel = configuration.remote.model
     }
 
+    /// The typed key as it would be stored. A ChatGPT token must parse as an
+    /// access token and loses a pasted "Bearer " prefix.
+    private func validatedTypedKey() throws -> String? {
+        guard !apiKey.isEmpty else { return nil }
+        guard kind == .chatGPTWeb else { return apiKey }
+        guard let token = ChatGPTAccessToken(apiKey) else {
+            throw DictationFailure(message: "That is not a ChatGPT access token.", recovery: ChatGPTAccessToken.recovery)
+        }
+        return token.value
+    }
+
     func saveRemote() {
         do {
+            let typedKey = try validatedTypedKey()
             _ = try RemoteTranscriptionProvider.endpoint(for: draft)
-            try configuration.saveRemote(draft, apiKey: apiKey.isEmpty ? nil : apiKey)
+            try configuration.saveRemote(draft, apiKey: typedKey)
             apiKey = ""
             remoteResult = "Configuration saved."
         } catch let failure as DictationFailure {
@@ -66,7 +80,9 @@ final class TranscriptionSettingsController: ObservableObject {
     /// persist the typed key — only Save Configuration commits.
     func testRemoteConnection() {
         let draft = draft
+        let typedKey: String
         do {
+            typedKey = try validatedTypedKey() ?? ""
             _ = try RemoteTranscriptionProvider.endpoint(for: draft)
         } catch let failure as DictationFailure {
             remoteResult = failure.message
@@ -76,7 +92,6 @@ final class TranscriptionSettingsController: ObservableObject {
             return
         }
         remoteResult = "Testing connection…"
-        let typedKey = apiKey
         testTask?.cancel()
         testTask = Task { [weak self] in
             guard let self else { return }
@@ -112,7 +127,9 @@ final class TranscriptionSettingsController: ObservableObject {
         do {
             try configuration.removeAPIKey()
             apiKey = ""
-            remoteResult = "API key removed. Remote requests will use no authentication."
+            remoteResult = kind == .chatGPTWeb
+                ? "Access token removed."
+                : "API key removed. Remote requests will use no authentication."
         } catch let failure as DictationFailure {
             remoteResult = failure.message
         } catch {

@@ -86,10 +86,16 @@ final class ProviderConfigurationStore: ObservableObject {
     }
     private let defaults: UserDefaults
     private let credentials: CredentialStoring
+    private let now: () -> Date
 
-    init(defaults: UserDefaults = .standard, credentials: CredentialStoring = FileCredentialStore()) {
+    init(
+        defaults: UserDefaults = .standard,
+        credentials: CredentialStoring = FileCredentialStore(),
+        now: @escaping () -> Date = Date.init
+    ) {
         self.defaults = defaults
         self.credentials = credentials
+        self.now = now
         let remoteData = defaults.data(forKey: Keys.remote)
         remote = remoteData.flatMap { try? JSONDecoder().decode(RemoteProviderConfiguration.self, from: $0) } ?? .init()
         hasAPIKey = ((try? credentials.read()) ?? nil)?.isEmpty == false
@@ -122,6 +128,7 @@ final class ProviderConfigurationStore: ObservableObject {
     }
 
     func readiness() -> ProviderReadiness {
+        if remote.kind == .chatGPTWeb { return chatGPTReadiness() }
         do {
             _ = try RemoteTranscriptionProvider.endpoint(for: remote)
             return .ready(hasAPIKey
@@ -132,6 +139,24 @@ final class ProviderConfigurationStore: ObservableObject {
         } catch {
             return .unavailable("Remote configuration is invalid.")
         }
+    }
+
+    /// The token expires after about ten days and is never refreshed, so an
+    /// expired one blocks dictation before recording instead of after it.
+    private func chatGPTReadiness() -> ProviderReadiness {
+        guard let raw = (try? credentials.read()) ?? nil else {
+            return .unavailable("Paste a ChatGPT access token in Transcription settings.")
+        }
+        guard let token = ChatGPTAccessToken(raw) else {
+            return .unavailable("The saved credential is not a ChatGPT access token.")
+        }
+        guard let expiresAt = token.expiresAt else {
+            return .ready("ChatGPT transcription is configured with a saved access token.")
+        }
+        let date = expiresAt.formatted(date: .abbreviated, time: .shortened)
+        return token.isExpired(at: now())
+            ? .unavailable("The ChatGPT access token expired on \(date). Paste a fresh one in Transcription settings.")
+            : .ready("ChatGPT transcription is configured. The access token expires on \(date).")
     }
 
     func status() -> ProviderStatus {
