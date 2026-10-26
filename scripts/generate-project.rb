@@ -57,7 +57,9 @@ app.build_configurations.each do |config|
   # A stable signing identity keeps the Microphone, Accessibility, and Input
   # Monitoring grants across rebuilds; ad-hoc signatures reset them each time.
   config.build_settings['DEVELOPMENT_TEAM'] = 'DPGLZB4Y9K'
-  config.build_settings.delete('CODE_SIGN_ENTITLEMENTS')
+  # Hardened Runtime denies microphone capture, without any prompt, unless
+  # the signature carries the audio-input entitlement.
+  config.build_settings['CODE_SIGN_ENTITLEMENTS'] = 'WinterVoice/Resources/WinterVoice.entitlements'
 end
 
 tests.build_configurations.each do |config|
@@ -77,7 +79,6 @@ project.predictabilize_uuids
 tests.add_dependency(app)
 project.sort
 project.predictabilize_uuids
-# The team is set per configuration above; no entitlement file is persisted.
 project.root_object.attributes.delete('TargetAttributes')
 project.save
 
