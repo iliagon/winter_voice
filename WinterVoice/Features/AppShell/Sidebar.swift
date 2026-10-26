@@ -65,13 +65,11 @@ private struct NavPillSurface: ViewModifier {
 }
 
 /// The navigation rail below the titlebar strip: a flat list of destinations,
-/// then the words counter and account card of the reference app. The titlebar
+/// then the account card of the reference app. The titlebar
 /// toggle collapses it to an icon-only rail instead of hiding it.
 struct WVSidebar: View {
     @ObservedObject var presenter: AppShellPresenter
     @ObservedObject private var dictationPresenter: DictationPresenter
-    @ObservedObject private var usageStats: UsageStatsStore
-    @ObservedObject private var updates: UpdateController
 
     /// Shared with the titlebar toggle button through UserDefaults.
     @AppStorage(SidebarVisibility.key) private var isExpanded = true
@@ -79,12 +77,10 @@ struct WVSidebar: View {
     init(presenter: AppShellPresenter) {
         self.presenter = presenter
         _dictationPresenter = ObservedObject(wrappedValue: presenter.dictationPresenter)
-        _usageStats = ObservedObject(wrappedValue: presenter.usageStats)
-        _updates = ObservedObject(wrappedValue: presenter.updates)
     }
 
     private let items: [AppShellDestination] = [
-        .overview, .history, .dictionary, .hotkey, .settings,
+        .overview, .history, .hotkey, .settings,
     ]
 
     var body: some View {
@@ -108,14 +104,6 @@ struct WVSidebar: View {
 
             Spacer(minLength: 0)
 
-            if let update = updates.state.activeUpdate {
-                if isExpanded {
-                    updateBanner(update)
-                } else {
-                    collapsedUpdateBadge(update)
-                }
-            }
-
             if isExpanded {
                 footer
             } else {
@@ -132,156 +120,9 @@ struct WVSidebar: View {
 
     private var listening: Bool { dictationPresenter.hotkeyHealth == .listening }
 
-    /// Notification card for the whole update lifecycle: discovery with a
-    /// one-click Update action, in-card download progress, the brief
-    /// installing beat before relaunch, and a browser fallback on failure —
-    /// no Settings visit needed.
-    private func updateBanner(_ update: AvailableUpdate) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top, spacing: 8) {
-                WVBrandMark(size: 20)
-                Text(bannerTitle)
-                    .font(.wv(12.5, .semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                Spacer(minLength: 0)
-                if !updates.state.isInstallBusy {
-                    Button { updates.skip(update) } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(Theme.textTertiary)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .focusEffectDisabled()
-                    .help("Skip this version")
-                }
-            }
-
-            switch updates.state {
-            case .downloading(_, let fraction):
-                ProgressView(value: fraction)
-                    .tint(Theme.accent)
-                    .controlSize(.small)
-                Text("Downloading version \(update.version)… \(Int(fraction * 100))%")
-                    .font(.wv(11))
-                    .foregroundStyle(Theme.textSecondary)
-            case .installing:
-                ProgressView()
-                    .controlSize(.small)
-                Text("Installing… MacVoice will relaunch in a moment.")
-                    .font(.wv(11))
-                    .foregroundStyle(Theme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            case .installFailed(_, let message):
-                Text(message)
-                    .font(.wv(11))
-                    .foregroundStyle(Theme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                bannerAction("Download in Browser") { updates.download(update) }
-            default:
-                Text("Version \(update.version) is ready to install.")
-                    .font(.wv(11))
-                    .foregroundStyle(Theme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                bannerAction("Update Now") { updates.install(update) }
-            }
-        }
-        .padding(10)
-        .background {
-            RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
-                .fill(Theme.surfaceElevated)
-                .overlay {
-                    RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
-                        .strokeBorder(Theme.border, lineWidth: 1)
-                }
-        }
-        .padding(.horizontal, 10)
-        .padding(.bottom, 8)
-    }
-
-    private var bannerTitle: String {
-        switch updates.state {
-        case .downloading: "Updating MacVoice"
-        case .installing: "Almost there"
-        case .installFailed: "Automatic update failed"
-        default: "New version available"
-        }
-    }
-
-    private func bannerAction(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Text(title)
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 9, weight: .semibold))
-            }
-            .font(.wv(11.5, .semibold))
-            .foregroundStyle(Theme.accent)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background {
-                RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous)
-                    .fill(Theme.accent.opacity(0.14))
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .focusEffectDisabled()
-        .padding(.top, 2)
-    }
-
-    /// Collapsed-rail version of the update banner: the accent glyph starts
-    /// the one-click install; a live install shows a spinner instead.
-    @ViewBuilder
-    private func collapsedUpdateBadge(_ update: AvailableUpdate) -> some View {
-        if updates.state.isInstallBusy {
-            ProgressView()
-                .controlSize(.small)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-                .padding(.bottom, 4)
-                .help("Updating to version \(update.version)…")
-        } else {
-            Button { updates.install(update) } label: {
-                Image(systemName: badgeSymbol)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Theme.accent)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .focusEffectDisabled()
-            .padding(.bottom, 4)
-            .help("Update available: version \(update.version)")
-        }
-    }
-
-    private var badgeSymbol: String {
-        if case .installFailed = updates.state { "exclamationmark.circle.fill" } else { "arrow.down.circle.fill" }
-    }
-
     private var footer: some View {
         VStack(alignment: .leading, spacing: 0) {
             WVDivider()
-
-            HStack(spacing: 10) {
-                Image(systemName: "text.word.spacing")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Theme.textSecondary)
-                    .frame(width: 19)
-                Text("Words")
-                    .font(.wv(13.5, .medium))
-                    .foregroundStyle(Theme.textSecondary)
-                Spacer(minLength: 0)
-                Text(usageStats.totals.totalWords.formatted())
-                    .font(.wv(13, .semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                    .monospacedDigit()
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 14)
-            .padding(.bottom, 12)
 
             HStack(spacing: 10) {
                 avatar
@@ -303,7 +144,7 @@ struct WVSidebar: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 14)
-            .padding(.bottom, 14)
+            .padding(.vertical, 14)
         }
     }
 

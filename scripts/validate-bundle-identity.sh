@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-expected_identifier=com.winterzxzz.WinterVoice
+expected_identifier=com.iliagon.Dictation
 source_plist=WinterVoice/Resources/Info.plist
 
 source_identifier=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$source_plist")

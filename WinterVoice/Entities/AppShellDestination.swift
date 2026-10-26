@@ -8,7 +8,6 @@ enum FeatureAvailability: Equatable, Sendable {
 enum AppShellDestination: String, CaseIterable, Identifiable, Sendable {
     case overview
     case history
-    case dictionary
     case hotkey
     case settings
 
@@ -16,7 +15,7 @@ enum AppShellDestination: String, CaseIterable, Identifiable, Sendable {
 
     var availability: FeatureAvailability {
         switch self {
-        case .overview, .history, .dictionary, .hotkey, .settings:
+        case .overview, .history, .hotkey, .settings:
             .available
         }
     }

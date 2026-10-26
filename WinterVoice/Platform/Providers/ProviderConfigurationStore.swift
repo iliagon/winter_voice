@@ -69,19 +69,11 @@ final class FileCredentialStore: CredentialStoring {
 
 @MainActor
 final class ProviderConfigurationStore: ObservableObject {
-    var onModeChange: ((ProviderMode) -> Void)?
-
-    @Published var mode: ProviderMode {
-        didSet {
-            defaults.set(mode.rawValue, forKey: Keys.mode)
-            if oldValue != mode { onModeChange?(mode) }
-        }
-    }
     @Published var remote: RemoteProviderConfiguration
     @Published private(set) var hasAPIKey: Bool
 
-    /// The ISO 639-1 code both local whisper and cloud transcription obey;
-    /// `nil` means auto-detect.
+    /// The ISO 639-1 code sent as the transcription `language`; `nil` means
+    /// auto-detect.
     @Published var languageCode: String? {
         didSet { defaults.set(languageCode ?? Self.autoLanguage, forKey: Keys.language) }
     }
@@ -89,7 +81,6 @@ final class ProviderConfigurationStore: ObservableObject {
     private static let autoLanguage = "auto"
 
     private enum Keys {
-        static let mode = "transcription.provider.mode"
         static let remote = "transcription.remote.configuration"
         static let language = "transcription.language"
     }
@@ -99,7 +90,6 @@ final class ProviderConfigurationStore: ObservableObject {
     init(defaults: UserDefaults = .standard, credentials: CredentialStoring = FileCredentialStore()) {
         self.defaults = defaults
         self.credentials = credentials
-        mode = defaults.string(forKey: Keys.mode).flatMap(ProviderMode.init(rawValue:)) ?? .local
         let remoteData = defaults.data(forKey: Keys.remote)
         remote = remoteData.flatMap { try? JSONDecoder().decode(RemoteProviderConfiguration.self, from: $0) } ?? .init()
         hasAPIKey = ((try? credentials.read()) ?? nil)?.isEmpty == false
@@ -131,28 +121,20 @@ final class ProviderConfigurationStore: ObservableObject {
         hasAPIKey = false
     }
 
-    func readiness(localModels: ModelManager) -> ProviderReadiness {
-        switch mode {
-        case .local:
-            guard let active = localModels.activeModel else {
-                return .unavailable("Choose and download a local model below.")
-            }
-            return .ready("\(active.displayName) is installed and ready for private, on-device transcription.")
-        case .remote:
-            do {
-                _ = try RemoteTranscriptionProvider.endpoint(for: remote)
-                return .ready(hasAPIKey
-                    ? "Generic OpenAI-compatible remote provider is configured with a saved API key."
-                    : "Generic OpenAI-compatible remote provider is configured without authentication.")
-            } catch let error as DictationFailure {
-                return .unavailable(error.message)
-            } catch {
-                return .unavailable("Remote configuration is invalid.")
-            }
+    func readiness() -> ProviderReadiness {
+        do {
+            _ = try RemoteTranscriptionProvider.endpoint(for: remote)
+            return .ready(hasAPIKey
+                ? "Generic OpenAI-compatible remote provider is configured with a saved API key."
+                : "Generic OpenAI-compatible remote provider is configured without authentication.")
+        } catch let error as DictationFailure {
+            return .unavailable(error.message)
+        } catch {
+            return .unavailable("Remote configuration is invalid.")
         }
     }
 
-    func status(localModels: ModelManager) -> ProviderStatus {
-        ProviderStatus(mode: mode, readiness: readiness(localModels: localModels))
+    func status() -> ProviderStatus {
+        ProviderStatus(readiness: readiness())
     }
 }

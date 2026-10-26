@@ -15,18 +15,6 @@ tests = project.new_target(:unit_test_bundle, 'WinterVoiceTests', :osx, '14.0')
 # it) to PRODUCT_NAME below.
 app.product_reference.path = 'MacVoice.app'
 
-# Pinned upstream whisper.cpp XCFramework wrapped as a local Swift package.
-whisper_package = project.new(Xcodeproj::Project::Object::XCLocalSwiftPackageReference)
-whisper_package.relative_path = 'Vendor/WhisperBinary'
-project.root_object.package_references << whisper_package
-whisper_product = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
-whisper_product.package = whisper_package
-whisper_product.product_name = 'WhisperBinary'
-app.package_product_dependencies << whisper_product
-whisper_build_file = project.new(Xcodeproj::Project::Object::PBXBuildFile)
-whisper_build_file.product_ref = whisper_product
-app.frameworks_build_phase.files << whisper_build_file
-
 app_group = project.main_group.new_group('WinterVoice', 'WinterVoice')
 Dir.glob(File.join(root, 'WinterVoice', '**', '*.swift')).sort.each do |path|
   app.add_file_references([app_group.new_file(path.delete_prefix(File.join(root, 'WinterVoice') + '/'))])
@@ -50,10 +38,9 @@ Dir.glob(File.join(root, 'WinterVoiceTests', '**', '*.swift')).sort.each do |pat
 end
 
 app.build_configurations.each do |config|
-  config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.winterzxzz.WinterVoice'
-  # The shipped app is MacVoice.app; the target, Swift module, and bundle
-  # identifier keep the WinterVoice name so existing installs keep their
-  # permissions, data, and update path.
+  config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.iliagon.Dictation'
+  # The shipped app is MacVoice.app; the target and Swift module keep the
+  # WinterVoice name so the fork stays diffable against upstream.
   config.build_settings['PRODUCT_NAME'] = 'MacVoice'
   config.build_settings['PRODUCT_MODULE_NAME'] = 'WinterVoice'
   config.build_settings['GENERATE_INFOPLIST_FILE'] = 'NO'
@@ -62,16 +49,19 @@ app.build_configurations.each do |config|
   config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = '14.0'
   config.build_settings['SWIFT_VERSION'] = '6.0'
   config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'complete'
-  config.build_settings['CODE_SIGN_STYLE'] = 'Automatic'
+  config.build_settings['CODE_SIGN_STYLE'] = 'Manual'
+  config.build_settings['CODE_SIGN_IDENTITY'] = 'Apple Development'
   # Hardened Runtime blocks DYLD_INSERT_LIBRARIES-style injection into a
   # process holding Microphone, Accessibility, and Input Monitoring grants.
   config.build_settings['ENABLE_HARDENED_RUNTIME'] = 'YES'
-  config.build_settings.delete('DEVELOPMENT_TEAM')
+  # A stable signing identity keeps the Microphone, Accessibility, and Input
+  # Monitoring grants across rebuilds; ad-hoc signatures reset them each time.
+  config.build_settings['DEVELOPMENT_TEAM'] = 'DPGLZB4Y9K'
   config.build_settings.delete('CODE_SIGN_ENTITLEMENTS')
 end
 
 tests.build_configurations.each do |config|
-  config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.winterzxzz.WinterVoiceTests'
+  config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.iliagon.DictationTests'
   config.build_settings['GENERATE_INFOPLIST_FILE'] = 'YES'
   config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = '14.0'
   config.build_settings['SWIFT_VERSION'] = '6.0'
@@ -87,9 +77,7 @@ project.predictabilize_uuids
 tests.add_dependency(app)
 project.sort
 project.predictabilize_uuids
-# Keep local signing selectable in Xcode. The owner chooses a Personal Team
-# locally; this generated project must not persist a particular team or
-# entitlement file.
+# The team is set per configuration above; no entitlement file is persisted.
 project.root_object.attributes.delete('TargetAttributes')
 project.save
 

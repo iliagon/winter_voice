@@ -20,7 +20,7 @@ struct OverviewView: View {
     }
 
     var body: some View {
-        WVPage(icon: "house", title: "Home", subtitle: "Your usage at a glance.") {
+        WVPage(icon: "house", title: "Home", subtitle: "Your recent dictations at a glance.") {
             if !permissionsReady {
                 WVCard {
                     HStack(alignment: .top, spacing: Theme.Space.sm) {
@@ -41,8 +41,6 @@ struct OverviewView: View {
                     }
                 }
             }
-
-            UsageStatsSection(store: presenter.usageStats)
 
             recentActivity
         }

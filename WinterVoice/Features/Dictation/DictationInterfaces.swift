@@ -27,16 +27,6 @@ final class NoopHistoryRecorder: HistoryRecording {
     func record(text: String) {}
 }
 
-@MainActor
-protocol UsageRecording: AnyObject {
-    func recordSession(words: Int, speakingSeconds: Double)
-}
-
-@MainActor
-final class NoopUsageRecorder: UsageRecording {
-    func recordSession(words: Int, speakingSeconds: Double) {}
-}
-
 /// Behavior toggles the dictation pipeline reads at session time.
 @MainActor
 protocol DictationBehaviorProviding: AnyObject {

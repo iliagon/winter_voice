@@ -233,40 +233,21 @@ final class NoProviderDictationTests: XCTestCase {
         XCTAssertEqual(injector.captureCallCount, 0)
     }
 
-    func testRealTranscriberWithoutLocalModelFailsWithProductionMessage() throws {
-        let suite = "NoLocalModelDictationTests.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
-
-        assertRealTranscriberFailsDirectly(
-            transcriber: makeRealTranscriber(mode: .local, defaults: defaults),
-            expectedMessage: "No local model is selected."
-        )
-    }
-
     func testRealTranscriberWithUnconfiguredRemoteFailsWithProductionMessage() throws {
         let suite = "UnconfiguredRemoteDictationTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
 
         assertRealTranscriberFailsDirectly(
-            transcriber: makeRealTranscriber(mode: .remote, defaults: defaults),
+            transcriber: makeRealTranscriber(defaults: defaults),
             expectedMessage: "Remote transcription provider is not configured."
         )
     }
 
-    private func makeRealTranscriber(mode: ProviderMode, defaults: UserDefaults) -> ConfiguredTranscriber {
-        let store = ProviderConfigurationStore(defaults: defaults, credentials: CredentialStoreSpy())
-        store.mode = mode
-        let models = ModelManager(
-            root: FileManager.default.temporaryDirectory
-                .appendingPathComponent("WinterVoice-RealProviderTests-\(UUID().uuidString)", isDirectory: true)
-        )
-        return ConfiguredTranscriber(
+    private func makeRealTranscriber(defaults: UserDefaults) -> ConfiguredTranscriber {
+        ConfiguredTranscriber(
             recorder: AudioRecorderSpy(),
-            configuration: store,
-            models: models,
-            localRuntime: LocalRuntimeSpy()
+            configuration: ProviderConfigurationStore(defaults: defaults, credentials: CredentialStoreSpy())
         )
     }
 
@@ -524,12 +505,6 @@ private final class AudioRecorderSpy: AudioRecording {
     func start() throws {}
     func stop() throws -> RecordedAudio { RecordedAudio(samples: [], sampleRate: 16_000) }
     func cancel() {}
-}
-
-private actor LocalRuntimeSpy: LocalTranscriptionRunning {
-    func transcribe(_ audio: RecordedAudio, modelURL: URL, language: String?) -> String { "" }
-    nonisolated func cancelActiveTranscription() {}
-    func unloadContext() {}
 }
 
 private final class CredentialStoreSpy: CredentialStoring {

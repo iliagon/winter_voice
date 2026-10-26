@@ -1,9 +1,8 @@
 import Foundation
 
-/// A transcription language shared by local whisper and cloud providers.
-/// The selection is stored as an ISO 639-1 code (what whisper.cpp and
-/// OpenAI-compatible endpoints both accept); a `nil` selection means
-/// auto-detect.
+/// A transcription language for the remote provider. The selection is stored
+/// as an ISO 639-1 code (what OpenAI-compatible endpoints accept); a `nil`
+/// selection means auto-detect.
 struct TranscriptionLanguage: Identifiable, Equatable, Sendable {
     let code: String
     let name: String

@@ -1,130 +1,49 @@
 import Foundation
-import AVFoundation
-import CryptoKit
 import XCTest
 @testable import WinterVoice
 
 @MainActor
 final class ProviderConfigurationTests: XCTestCase {
-    func testSelectedLocalModelIsReadyAndTranscribesThroughLocalRuntime() async throws {
-        let suite = "LocalRuntimeMessageTests.\(UUID().uuidString)"
+    func testConfiguredTranscriberRoutesAudioAndLanguageToRemoteProvider() async throws {
+        let suite = "RemoteRoutingTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent(suite)
-        defer { try? FileManager.default.removeItem(at: root) }
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        let source = root.appendingPathComponent("model.bin")
-        let bytes = Data("local model".utf8)
-        try bytes.write(to: source)
-        let hash = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
-        let descriptor = ModelDescriptor(
-            id: "local-test", displayName: "Local Test", family: "whisper",
-            runtime: "whisper.cpp", variant: "tiny", quantization: nil,
-            downloadURL: URL(string: "https://models.example/model.bin")!,
-            fileName: "model.bin", fileSize: Int64(bytes.count), sha256: hash
-        )
-        let models = ModelManager(root: root.appendingPathComponent("store"))
-        try await models.installDownloadedFile(source, descriptor: descriptor)
-        await models.select(descriptor.id)
-        XCTAssertNil(models.lastError)
         let store = ProviderConfigurationStore(defaults: defaults, credentials: CredentialStoreSpy())
-        store.mode = .local
-        let runtime = LocalRuntimeSpy(result: "xin chào")
+        try store.saveRemote(.init(baseURL: "https://host.example/v1", model: "m"), apiKey: "secret")
+        store.languageCode = "ru"
+        let transport = RemoteTransportSpy(status: 200, body: #"{"text":"héllo wörld"}"#)
         let subject = ConfiguredTranscriber(
             recorder: AudioRecorderSpy(samples: [0.1, -0.1]),
             configuration: store,
-            models: models,
-            localRuntime: runtime
+            remoteProvider: RemoteTranscriptionProvider(transport: transport)
         )
 
         XCTAssertNoThrow(try subject.validateConfiguration())
         try await subject.start()
         let transcription = try await subject.stop()
-        XCTAssertEqual(transcription, "xin chào")
-        let request = await runtime.request
-        XCTAssertEqual(request?.audio.samples, [0.1, -0.1])
-        XCTAssertEqual(request?.audio.sampleRate, 16_000)
-        XCTAssertEqual(request?.modelURL.lastPathComponent, "model.bin")
-        XCTAssertNil(request?.language)
+        XCTAssertEqual(transcription, "héllo wörld")
+        let capturedRequest = await transport.capturedRequest()
+        let request = try XCTUnwrap(capturedRequest)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer secret")
+        let body = String(decoding: try XCTUnwrap(request.httpBody), as: UTF8.self)
+        XCTAssertTrue(body.contains("name=\"language\"\r\n\r\nru"))
     }
 
-    func testEnglishOnlyModelRoutesEnglishLanguageToLocalRuntime() async throws {
-        let suite = "EnglishOnlyRoutingTests.\(UUID().uuidString)"
+    func testUnconfiguredRemoteFailsValidationBeforeRecording() throws {
+        let suite = "RemoteValidationTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent(suite)
-        defer { try? FileManager.default.removeItem(at: root) }
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        let source = root.appendingPathComponent("ggml-tiny.en.bin")
-        let bytes = Data("english-only model".utf8)
-        try bytes.write(to: source)
-        let hash = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
-        let descriptor = ModelDescriptor(
-            id: "local-test-en", displayName: "Local Test English", family: "whisper",
-            runtime: "whisper.cpp", variant: "tiny.en", quantization: nil,
-            downloadURL: URL(string: "https://models.example/ggml-tiny.en.bin")!,
-            fileName: "ggml-tiny.en.bin", fileSize: Int64(bytes.count), sha256: hash
-        )
-        let models = ModelManager(root: root.appendingPathComponent("store"))
-        try await models.installDownloadedFile(source, descriptor: descriptor)
-        await models.select(descriptor.id)
-        XCTAssertNil(models.lastError)
-        XCTAssertEqual(models.activeModel?.isEnglishOnly, true)
-        let store = ProviderConfigurationStore(defaults: defaults, credentials: CredentialStoreSpy())
-        store.mode = .local
-        // Even an explicit selection must not override an English-only model.
-        store.languageCode = "vi"
-        let runtime = LocalRuntimeSpy(result: "hello")
         let subject = ConfiguredTranscriber(
-            recorder: AudioRecorderSpy(samples: [0.1, -0.1]),
-            configuration: store,
-            models: models,
-            localRuntime: runtime
+            recorder: AudioRecorderSpy(),
+            configuration: ProviderConfigurationStore(defaults: defaults, credentials: CredentialStoreSpy())
         )
 
-        try await subject.start()
-        let transcription = try await subject.stop()
-        XCTAssertEqual(transcription, "hello")
-        let request = await runtime.request
-        XCTAssertEqual(request?.modelURL.lastPathComponent, "ggml-tiny.en.bin")
-        XCTAssertEqual(request?.language, "en")
-    }
-
-    func testSelectedLanguageRoutesToLocalRuntimeForMultilingualModel() async throws {
-        let suite = "SelectedLanguageRoutingTests.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent(suite)
-        defer { try? FileManager.default.removeItem(at: root) }
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        let source = root.appendingPathComponent("model.bin")
-        let bytes = Data("multilingual model".utf8)
-        try bytes.write(to: source)
-        let hash = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
-        let descriptor = ModelDescriptor(
-            id: "local-test-multi", displayName: "Local Test Multi", family: "whisper",
-            runtime: "whisper.cpp", variant: "tiny", quantization: nil,
-            downloadURL: URL(string: "https://models.example/model.bin")!,
-            fileName: "model.bin", fileSize: Int64(bytes.count), sha256: hash
-        )
-        let models = ModelManager(root: root.appendingPathComponent("store"))
-        try await models.installDownloadedFile(source, descriptor: descriptor)
-        await models.select(descriptor.id)
-        let store = ProviderConfigurationStore(defaults: defaults, credentials: CredentialStoreSpy())
-        store.mode = .local
-        store.languageCode = "vi"
-        let runtime = LocalRuntimeSpy(result: "xin chào")
-        let subject = ConfiguredTranscriber(
-            recorder: AudioRecorderSpy(samples: [0.1, -0.1]),
-            configuration: store,
-            models: models,
-            localRuntime: runtime
-        )
-
-        try await subject.start()
-        _ = try await subject.stop()
-        let request = await runtime.request
-        XCTAssertEqual(request?.language, "vi")
+        XCTAssertThrowsError(try subject.validateConfiguration()) { error in
+            XCTAssertEqual(
+                (error as? DictationFailure)?.message,
+                "Remote transcription provider is not configured."
+            )
+        }
     }
 
     func testLanguageSelectionPersistsAndAdoptsLegacyRemoteLanguage() throws {
@@ -158,44 +77,37 @@ final class ProviderConfigurationTests: XCTestCase {
         }
     }
 
-    func testModeRemoteConfigurationAndCredentialPersistAtTheirOwnedStores() throws {
+    func testRemoteConfigurationAndCredentialPersistAtTheirOwnedStores() throws {
         let suite = "ProviderConfigurationTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let credentials = CredentialStoreSpy()
         let subject = ProviderConfigurationStore(defaults: defaults, credentials: credentials)
 
-        subject.mode = .remote
         try subject.saveRemote(
             .init(baseURL: "https://host.example/v1", model: "transcriber"),
             apiKey: "secret"
         )
         let restored = ProviderConfigurationStore(defaults: defaults, credentials: credentials)
 
-        XCTAssertEqual(restored.mode, .remote)
         XCTAssertEqual(restored.remote.model, "transcriber")
         XCTAssertEqual(try restored.apiKey(), "secret")
         XCTAssertFalse(defaults.dictionaryRepresentation().values.contains { "\($0)".contains("secret") })
     }
 
-    func testProviderStatusIsSingleTruthForReadyRemoteAndBlockedLocal() throws {
+    func testProviderStatusIsSingleTruthForUnconfiguredAndReadyRemote() throws {
         let suite = "ProviderStatusTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let credentials = CredentialStoreSpy()
         let store = ProviderConfigurationStore(defaults: defaults, credentials: credentials)
-        let modelRoot = FileManager.default.temporaryDirectory.appendingPathComponent(suite)
-        defer { try? FileManager.default.removeItem(at: modelRoot) }
-        let models = ModelManager(root: modelRoot)
 
-        XCTAssertEqual(store.status(localModels: models).mode, .local)
-        XCTAssertFalse(store.status(localModels: models).isReady)
-        store.mode = .remote
+        XCTAssertFalse(store.status().isReady)
         try store.saveRemote(.init(baseURL: "https://host.example/v1", model: "m"), apiKey: nil)
-        XCTAssertTrue(store.status(localModels: models).isReady)
-        XCTAssertTrue(store.status(localModels: models).readiness.detail.contains("without authentication"))
+        XCTAssertTrue(store.status().isReady)
+        XCTAssertTrue(store.status().readiness.detail.contains("without authentication"))
         try store.saveRemote(.init(baseURL: "https://host.example/v1", model: "m"), apiKey: "secret")
-        let remote = store.status(localModels: models)
+        let remote = store.status()
         XCTAssertTrue(remote.isReady)
         XCTAssertTrue(remote.overviewSummary.contains("Transcription is ready"))
         XCTAssertTrue(remote.privacySummary.contains("configured remote endpoint"))
@@ -208,8 +120,6 @@ final class ProviderConfigurationTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
         let credentials = CredentialStoreSpy()
         let store = ProviderConfigurationStore(defaults: defaults, credentials: credentials)
-        let models = ModelManager(root: FileManager.default.temporaryDirectory.appendingPathComponent(suite))
-        store.mode = .remote
         try store.saveRemote(.init(baseURL: "https://host.example/v1", model: "m"), apiKey: "secret")
 
         try store.saveRemote(store.remote, apiKey: nil)
@@ -218,7 +128,7 @@ final class ProviderConfigurationTests: XCTestCase {
 
         XCTAssertFalse(store.hasAPIKey)
         XCTAssertNil(try store.apiKey())
-        XCTAssertTrue(store.status(localModels: models).readiness.detail.contains("without authentication"))
+        XCTAssertTrue(store.status().readiness.detail.contains("without authentication"))
         let transport = RemoteTransportSpy(status: 200, body: #"{"text":"ok"}"#)
         _ = try await RemoteTranscriptionProvider(transport: transport).transcribe(
             audio: .init(samples: [0], sampleRate: 16_000),
@@ -237,14 +147,12 @@ final class ProviderConfigurationTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
         let credentials = CredentialStoreSpy(value: "secret", deleteError: TestFailure.expected)
         let store = ProviderConfigurationStore(defaults: defaults, credentials: credentials)
-        let models = ModelManager(root: FileManager.default.temporaryDirectory.appendingPathComponent(suite))
-        store.mode = .remote
         try store.saveRemote(.init(baseURL: "https://host.example", model: "m"), apiKey: nil)
 
         XCTAssertThrowsError(try store.removeAPIKey())
         XCTAssertTrue(store.hasAPIKey)
         XCTAssertEqual(try store.apiKey(), "secret")
-        XCTAssertTrue(store.status(localModels: models).readiness.detail.contains("saved API key"))
+        XCTAssertTrue(store.status().readiness.detail.contains("saved API key"))
     }
 
     func testFileCredentialStoreRoundTripsAndDeletes() throws {
@@ -448,85 +356,6 @@ final class RemoteProviderTests: XCTestCase {
     }
 }
 
-final class WhisperContextActorGuardTests: XCTestCase {
-    func testRejectsAudioThatIsNot16kHzBeforeAnyModelWork() async {
-        await assertTranscriptionFails(
-            audio: RecordedAudio(samples: [0.1, -0.1], sampleRate: 44_100),
-            messageContaining: "unsupported audio"
-        )
-    }
-
-    func testRejectsEmptyRecordingBeforeAnyModelWork() async {
-        await assertTranscriptionFails(
-            audio: RecordedAudio(samples: [], sampleRate: 16_000),
-            messageContaining: "No speech was recorded"
-        )
-    }
-
-    func testRejectsMissingModelFileBeforeLoadingRuntime() async {
-        await assertTranscriptionFails(
-            audio: RecordedAudio(samples: [0.1, -0.1], sampleRate: 16_000),
-            modelURL: FileManager.default.temporaryDirectory
-                .appendingPathComponent("WhisperGuardTests.\(UUID().uuidString)")
-                .appendingPathComponent("ggml-missing.bin"),
-            messageContaining: "missing"
-        )
-    }
-
-    private func assertTranscriptionFails(
-        audio: RecordedAudio,
-        modelURL: URL = URL(fileURLWithPath: "/nonexistent/whisper-guard-model.bin"),
-        messageContaining fragment: String,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) async {
-        do {
-            _ = try await WhisperContextActor().transcribe(audio, modelURL: modelURL, language: nil)
-            XCTFail("Expected transcription to be rejected", file: file, line: line)
-        } catch let failure as DictationFailure {
-            XCTAssertTrue(
-                failure.message.contains(fragment),
-                "\(failure.message.debugDescription) should contain \(fragment.debugDescription)",
-                file: file, line: line
-            )
-        } catch {
-            XCTFail("Unexpected error: \(error)", file: file, line: line)
-        }
-    }
-}
-
-final class WhisperRuntimeIntegrationTests: XCTestCase {
-    func testRealWhisperRuntimeTranscribesFixtureWhenPathsAreProvided() async throws {
-        let environment = ProcessInfo.processInfo.environment
-        let modelPath = environment["WINTERVOICE_WHISPER_TEST_MODEL"]
-            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("WinterVoice/Models/whisper-tiny/ggml-tiny.bin").path
-        let audioPath = environment["WINTERVOICE_WHISPER_TEST_AUDIO"] ?? "/tmp/whisper-jfk.wav"
-        guard FileManager.default.fileExists(atPath: modelPath),
-              FileManager.default.fileExists(atPath: audioPath) else {
-            throw XCTSkip("Install Whisper Tiny and provide the JFK fixture to run this integration test.")
-        }
-        let file = try AVAudioFile(forReading: URL(fileURLWithPath: audioPath))
-        let format = file.processingFormat
-        XCTAssertEqual(format.sampleRate, 16_000)
-        XCTAssertEqual(format.channelCount, 1)
-        let buffer = try XCTUnwrap(
-            AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(file.length))
-        )
-        try file.read(into: buffer)
-        let channel = try XCTUnwrap(buffer.floatChannelData?[0])
-        let samples = Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
-
-        let transcription = try await WhisperContextActor().transcribe(
-            RecordedAudio(samples: samples, sampleRate: format.sampleRate),
-            modelURL: URL(fileURLWithPath: modelPath),
-            language: "en"
-        )
-
-        XCTAssertTrue(transcription.localizedCaseInsensitiveContains("fellow Americans"))
-    }
-}
-
 private enum TestFailure: Error { case expected }
 
 @MainActor
@@ -536,27 +365,6 @@ private final class AudioRecorderSpy: AudioRecording {
     func start() throws {}
     func stop() throws -> RecordedAudio { RecordedAudio(samples: samples, sampleRate: 16_000) }
     func cancel() {}
-}
-
-private actor LocalRuntimeSpy: LocalTranscriptionRunning {
-    struct Request: Sendable {
-        let audio: RecordedAudio
-        let modelURL: URL
-        let language: String?
-    }
-
-    private(set) var request: Request?
-    private let result: String
-
-    init(result: String) { self.result = result }
-
-    func transcribe(_ audio: RecordedAudio, modelURL: URL, language: String?) -> String {
-        request = Request(audio: audio, modelURL: modelURL, language: language)
-        return result
-    }
-
-    nonisolated func cancelActiveTranscription() {}
-    func unloadContext() {}
 }
 
 private final class CredentialStoreSpy: CredentialStoring {

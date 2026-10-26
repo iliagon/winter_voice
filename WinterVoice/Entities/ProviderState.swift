@@ -1,12 +1,5 @@
 import Foundation
 
-enum ProviderMode: String, CaseIterable, Codable, Sendable {
-    case local
-    case remote
-
-    var title: String { self == .local ? "Local Model" : "Remote API" }
-}
-
 struct RemoteProviderConfiguration: Equatable, Codable, Sendable {
     var baseURL = ""
     var model = ""
@@ -29,10 +22,9 @@ enum ProviderReadiness: Equatable, Sendable {
 }
 
 struct ProviderStatus: Equatable, Sendable {
-    let mode: ProviderMode
     let readiness: ProviderReadiness
 
-    var title: String { mode.title }
+    var title: String { "Remote API" }
     var isReady: Bool { readiness.isReady }
     var stateLabel: String { isReady ? "Ready" : "Not ready" }
 
@@ -44,15 +36,8 @@ struct ProviderStatus: Equatable, Sendable {
     }
 
     var privacySummary: String {
-        switch (mode, isReady) {
-        case (.remote, true):
-            "Audio is sent only to your configured remote endpoint when you dictate. Optional API keys are stored locally on this Mac, unauthenticated endpoints receive no Authorization header, and audio or transcripts are not logged."
-        case (.remote, false):
-            "Remote mode is not ready, so dictation attempts do not record or send audio."
-        case (.local, true):
-            "Audio is transcribed privately on this Mac with the selected whisper.cpp model and is never sent to a remote provider."
-        case (.local, false):
-            "Local mode is not ready, so dictation attempts do not record or send audio."
-        }
+        isReady
+            ? "Audio is sent only to your configured remote endpoint when you dictate. Optional API keys are stored locally on this Mac, unauthenticated endpoints receive no Authorization header, and audio or transcripts are not logged."
+            : "Transcription is not configured, so dictation attempts do not record or send audio."
     }
 }

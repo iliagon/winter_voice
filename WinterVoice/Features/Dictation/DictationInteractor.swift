@@ -8,7 +8,6 @@ final class DictationInteractor: DictationInteracting {
     private let permissions: PermissionManaging
     private let textProcessor: TextProcessing
     private let history: HistoryRecording
-    private let usage: UsageRecording
     private let behavior: DictationBehaviorProviding
     private let transcriptCopier: TranscriptCopying
     private let failureResetDelay: Duration
@@ -21,7 +20,6 @@ final class DictationInteractor: DictationInteracting {
     private var finishTask: Task<Void, Never>?
     private var failureResetTask: Task<Void, Never>?
     private var releasePending = false
-    private var recordingStartedAt: Date?
 
     init(
         relay: DictationStateRelay,
@@ -30,7 +28,6 @@ final class DictationInteractor: DictationInteracting {
         permissions: PermissionManaging,
         textProcessor: TextProcessing = IdentityTextProcessor(),
         history: HistoryRecording = NoopHistoryRecorder(),
-        usage: UsageRecording = NoopUsageRecorder(),
         behavior: DictationBehaviorProviding = DefaultDictationBehavior(),
         transcriptCopier: TranscriptCopying = SystemTranscriptCopier(),
         failureResetDelay: Duration = .seconds(4)
@@ -41,7 +38,6 @@ final class DictationInteractor: DictationInteracting {
         self.permissions = permissions
         self.textProcessor = textProcessor
         self.history = history
-        self.usage = usage
         self.behavior = behavior
         self.transcriptCopier = transcriptCopier
         self.failureResetDelay = failureResetDelay
@@ -57,8 +53,8 @@ final class DictationInteractor: DictationInteracting {
         }
         // A press while transcribing is the only escape from a long
         // transcription: abort it instead of silently swallowing the press.
-        // cancel() aborts a local whisper run; cancelling the tasks propagates
-        // Swift task cancellation into an in-flight remote URLSession request.
+        // Cancelling the tasks propagates Swift task cancellation into the
+        // in-flight URLSession request.
         if machine.state == .processing {
             transcriber.cancel()
             preparationTask?.cancel()
@@ -132,7 +128,6 @@ final class DictationInteractor: DictationInteracting {
             }
             try await transcriber.start()
             move(to: .recording)
-            recordingStartedAt = Date()
             if releasePending { await finishDictation() }
         } catch {
             fail(error)
@@ -141,8 +136,6 @@ final class DictationInteractor: DictationInteracting {
 
     private func finishDictation() async {
         guard machine.state == .recording, usesClipboardDelivery || target != nil else { return }
-        let speakingSeconds = recordingStartedAt.map { Date().timeIntervalSince($0) } ?? 0
-        recordingStartedAt = nil
         move(to: .processing)
         do {
             let rawText = try await transcriber.stop()
@@ -169,10 +162,6 @@ final class DictationInteractor: DictationInteracting {
                 injector.discard(target)
                 self.target = nil
             }
-            usage.recordSession(
-                words: text.split(whereSeparator: \.isWhitespace).count,
-                speakingSeconds: speakingSeconds
-            )
             move(to: .idle)
         } catch is CancellationError {
             fail(DictationFailure(

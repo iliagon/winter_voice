@@ -57,8 +57,6 @@ struct AppShellView: View {
             OverviewView(presenter: presenter)
         case .history:
             HistoryView(store: presenter.history)
-        case .dictionary:
-            DictionaryView(store: presenter.dictionary)
         case .hotkey:
             HotkeyView(
                 presenter: presenter.dictationPresenter,
@@ -146,7 +144,6 @@ extension AppShellDestination {
         switch self {
         case .overview: "Home"
         case .history: "History"
-        case .dictionary: "Dictionary"
         case .hotkey: "Shortcuts"
         case .settings: "Settings"
         }
@@ -156,7 +153,6 @@ extension AppShellDestination {
         switch self {
         case .overview: "house"
         case .history: "clock.arrow.circlepath"
-        case .dictionary: "character.book.closed"
         case .hotkey: "keyboard"
         case .settings: "gearshape"
         }

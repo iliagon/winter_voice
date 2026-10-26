@@ -41,26 +41,10 @@ struct MenuBarView: View {
         Button("Settings…") { openSettings() }
             .keyboardShortcut(",")
 
-        Button(updateMenuTitle) {
-            shellPresenter.updates.checkNow()
-            shellPresenter.navigate(to: .settings)
-            openMainWindow()
-        }
-
         Divider()
 
         Button("Quit MacVoice") { presenter.quit() }
             .keyboardShortcut("q")
-    }
-
-    private var updateMenuTitle: String {
-        if shellPresenter.updates.state.isInstallBusy {
-            return "Updating MacVoice…"
-        }
-        if case .available(let update) = shellPresenter.updates.state {
-            return "Update Available: v\(update.version)…"
-        }
-        return "Check for Updates…"
     }
 
     private func openMainWindow() {
