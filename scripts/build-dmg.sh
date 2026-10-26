@@ -38,10 +38,13 @@ fi
 
 # Sign nested code first, then the app. Hardened Runtime denies microphone
 # capture without the audio-input entitlement, so the app is signed with it.
-find "$APP_PATH/Contents/Frameworks" -maxdepth 1 \( -name "*.framework" -o -name "*.dylib" \) 2>/dev/null \
-  | while IFS= read -r nested; do
-      codesign --force --options runtime --timestamp=none --sign "$SIGN_IDENTITY" "$nested"
-    done
+# The app currently embeds no frameworks; the folder only exists when it does.
+if [[ -d "$APP_PATH/Contents/Frameworks" ]]; then
+  find "$APP_PATH/Contents/Frameworks" -maxdepth 1 \( -name "*.framework" -o -name "*.dylib" \) \
+    | while IFS= read -r nested; do
+        codesign --force --options runtime --timestamp=none --sign "$SIGN_IDENTITY" "$nested"
+      done
+fi
 codesign --force --options runtime --timestamp=none \
   --entitlements "$ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$APP_PATH"
 codesign --verify --strict "$APP_PATH"
