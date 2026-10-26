@@ -51,7 +51,15 @@ struct WindowConfigurator: NSViewRepresentable {
         } else {
             window.backgroundColor = Theme.windowBackground
         }
-        window.appearance = NSAppearance(named: Theme.mode == .black ? .darkAqua : .aqua)
+        // Only assign a changed appearance. On macOS 26 every assignment —
+        // even of the same name — re-floats the titlebar views, which moves
+        // SwiftUI hosting views between superviews; when the shell replaces
+        // onboarding that re-entered SwiftUI's own appearance update and
+        // aborted inside AttributeGraph.
+        let appearanceName: NSAppearance.Name = Theme.mode == .black ? .darkAqua : .aqua
+        if window.appearance?.name != appearanceName {
+            window.appearance = NSAppearance(named: appearanceName)
+        }
         installBrandAccessory(in: window)
     }
 
