@@ -33,7 +33,7 @@ struct RecordingPanelView: View {
             .transition(.opacity)
         case .transcribing:
             pill {
-                ProcessingIndicator(style: .arc)
+                BreathingDots()
             }
             .transition(.opacity)
         case .done:
@@ -145,45 +145,23 @@ private struct WaveformBars: View {
     }
 }
 
-/// The transcribing indicator. Two looks are kept while the final one is
-/// chosen: a rotating arc and three breathing dots.
-struct ProcessingIndicator: View {
-    enum Style {
-        case arc
-        case dots
-    }
-
-    let style: Style
-
+/// The transcribing indicator: three dots breathing in a travelling wave.
+private struct BreathingDots: View {
     var body: some View {
         TimelineView(.animation) { timeline in
             let time = timeline.date.timeIntervalSinceReferenceDate
-            switch style {
-            case .arc:
-                ZStack {
+            HStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { index in
+                    // Each dot peaks a third of a cycle after the previous one.
+                    let wave = (sin(time * 6 - Double(index) * 0.9) + 1) / 2
                     Circle()
-                        .stroke(Color.white.opacity(0.2), lineWidth: 2)
-                    Circle()
-                        .trim(from: 0, to: 0.28 + 0.12 * CGFloat(sin(time * 3)))
-                        .stroke(Color.white, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                        .rotationEffect(.radians(time * 2 * .pi * 1.1))
+                        .fill(Color.white)
+                        .frame(width: 5, height: 5)
+                        .scaleEffect(0.7 + 0.45 * wave)
+                        .opacity(0.4 + 0.6 * wave)
                 }
-                .frame(width: 14, height: 14)
-            case .dots:
-                HStack(spacing: 4) {
-                    ForEach(0..<3, id: \.self) { index in
-                        // A travelling wave: each dot peaks a third of a
-                        // cycle after the previous one.
-                        let wave = (sin(time * 6 - Double(index) * 0.9) + 1) / 2
-                        Circle()
-                            .fill(Color.white)
-                            .frame(width: 5, height: 5)
-                            .scaleEffect(0.7 + 0.45 * wave)
-                            .opacity(0.4 + 0.6 * wave)
-                    }
-                }
-                .frame(height: 14)
             }
+            .frame(height: 14)
         }
     }
 }

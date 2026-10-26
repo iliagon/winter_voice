@@ -65,11 +65,7 @@ final class WidgetSnapshotTests: XCTestCase {
         model.phase = .listening
         try snap("1-listening")
         model.phase = .transcribing
-        try snap("2-transcribing-arc")
-        try write("2-transcribing-dots", ZStack {
-            Color.black.opacity(0.85)
-            ProcessingIndicator(style: .dots).padding(12)
-        })
+        try snap("2-transcribing")
         model.phase = .done
         try snap("3-done")
         model.phase = .failed(DictationFailure(
