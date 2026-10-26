@@ -1,8 +1,13 @@
 #!/bin/bash
 # Builds a Release MacVoice.app and packages it as build/MacVoice.dmg
-# with a drag-to-Applications layout. The app is ad-hoc signed; distribution
-# signing and notarization are roadmap work (see docs/DEVELOPMENT.md).
+# with a drag-to-Applications layout. The app is signed with SIGN_IDENTITY
+# (default: the local "Apple Development" certificate) and Hardened Runtime,
+# so macOS keeps its permissions across updates. It is not notarized:
+# Gatekeeper asks for confirmation the first time it opens on another Mac.
 set -euo pipefail
+
+SIGN_IDENTITY="${SIGN_IDENTITY:-Apple Development}"
+ENTITLEMENTS="WinterVoice/Resources/WinterVoice.entitlements"
 
 cd "$(dirname "$0")/.."
 
@@ -31,14 +36,15 @@ if [[ ! -d "$APP_PATH" ]]; then
   exit 1
 fi
 
-# Ad-hoc sign nested code first, then the app. Hardened runtime is left off:
-# its library validation refuses ad-hoc-signed frameworks (whisper.framework),
-# which makes the app fail at launch with a dyld Team ID mismatch.
+# Sign nested code first, then the app. Hardened Runtime denies microphone
+# capture without the audio-input entitlement, so the app is signed with it.
 find "$APP_PATH/Contents/Frameworks" -maxdepth 1 \( -name "*.framework" -o -name "*.dylib" \) 2>/dev/null \
   | while IFS= read -r nested; do
-      codesign --force --sign - "$nested"
+      codesign --force --options runtime --timestamp=none --sign "$SIGN_IDENTITY" "$nested"
     done
-codesign --force --sign - "$APP_PATH"
+codesign --force --options runtime --timestamp=none \
+  --entitlements "$ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$APP_PATH"
+codesign --verify --strict "$APP_PATH"
 
 STAGING_DIR="$(mktemp -d)"
 trap 'rm -rf "$STAGING_DIR"' EXIT
