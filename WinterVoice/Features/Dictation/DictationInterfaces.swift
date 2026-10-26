@@ -70,9 +70,15 @@ protocol AudioRecording: AnyObject {
 @MainActor
 protocol TextInjecting: AnyObject {
     func captureTarget() throws -> TextInsertionTarget
+    /// Where the captured field's caret is on screen, for placing the panel.
+    func anchor(for target: TextInsertionTarget) -> CaretAnchor?
     @discardableResult
     func insert(_ text: String, into target: TextInsertionTarget) async throws -> InsertionOutcome
     func discard(_ target: TextInsertionTarget)
+}
+
+extension TextInjecting {
+    func anchor(for target: TextInsertionTarget) -> CaretAnchor? { nil }
 }
 
 @MainActor

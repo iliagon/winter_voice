@@ -6,10 +6,20 @@ import Combine
 final class DictationStateMachineTests: XCTestCase {
     func testHappyPath() throws {
         var machine = DictationStateMachine()
-        for state in [DictationState.preparing, .recording, .processing, .inserting, .idle] {
+        for state in [DictationState.preparing, .recording, .processing, .inserting, .done, .idle] {
             try machine.transition(to: state)
         }
         XCTAssertEqual(machine.state, .idle)
+    }
+
+    func testInsertingMustConfirmDoneBeforeIdle() throws {
+        var machine = DictationStateMachine()
+        for state in [DictationState.preparing, .recording, .processing, .inserting] {
+            try machine.transition(to: state)
+        }
+        XCTAssertThrowsError(try machine.transition(to: .idle))
+        try machine.transition(to: .done)
+        XCTAssertThrowsError(try machine.transition(to: .preparing))
     }
 
     func testFailureCanRecoverToIdle() throws {
@@ -78,6 +88,74 @@ final class DictationInteractorFlowTests: XCTestCase {
             "The focused field must be captured exactly once, before transcriber.start and before any permission request"
         )
         XCTAssertEqual(permissions.requestCallCount, 0)
+    }
+
+    func testSuccessfulDictationConfirmsDoneThenReturnsToIdle() async {
+        let relay = DictationStateRelay()
+        var published: [DictationState] = []
+        let observer = relay.$state.sink { published.append($0) }
+        defer { observer.cancel() }
+        let subject = DictationInteractor(
+            relay: relay,
+            transcriber: ReadyTranscriberSpy(),
+            injector: TextInjectorSpy(),
+            permissions: AuthorizedPermissionManagerSpy(),
+            doneHoldDelay: .milliseconds(50)
+        )
+
+        subject.beginPushToTalk()
+        await waitUntil { relay.state == .recording }
+        subject.endPushToTalk()
+        await waitUntil { relay.state == .done }
+        await waitUntil { relay.state == .idle }
+
+        XCTAssertEqual(
+            Array(published.drop { $0 != .processing }),
+            [.processing, .inserting, .done, .idle]
+        )
+    }
+
+    func testPressDuringDoneStartsNextDictationImmediately() async {
+        let relay = DictationStateRelay()
+        let injector = TextInjectorSpy()
+        let subject = DictationInteractor(
+            relay: relay,
+            transcriber: ReadyTranscriberSpy(),
+            injector: injector,
+            permissions: AuthorizedPermissionManagerSpy(),
+            doneHoldDelay: .seconds(30)
+        )
+
+        subject.beginPushToTalk()
+        await waitUntil { relay.state == .recording }
+        subject.endPushToTalk()
+        await waitUntil { relay.state == .done }
+        subject.beginPushToTalk()
+        await waitUntil { relay.state == .recording }
+
+        XCTAssertEqual(relay.state, .recording)
+        XCTAssertEqual(injector.captureCallCount, 2)
+    }
+
+    func testCapturedAnchorIsPublishedForTheSessionAndClearedAtIdle() async {
+        let relay = DictationStateRelay()
+        let injector = TextInjectorSpy()
+        let caret = CaretAnchor(rect: CGRect(x: 100, y: 200, width: 0, height: 16), source: .caret)
+        injector.anchorToReturn = caret
+        let subject = DictationInteractor(
+            relay: relay,
+            transcriber: ReadyTranscriberSpy(),
+            injector: injector,
+            permissions: AuthorizedPermissionManagerSpy(),
+            doneHoldDelay: .milliseconds(10)
+        )
+
+        subject.beginPushToTalk()
+        await waitUntil { relay.state == .recording }
+        XCTAssertEqual(relay.anchor, caret)
+        subject.endPushToTalk()
+        await waitUntil { relay.state == .idle }
+        XCTAssertNil(relay.anchor)
     }
 
     func testStopFailureCancelsTranscriberDiscardsTargetAndAutoResetsToIdle() async {
@@ -477,6 +555,7 @@ private final class TextInjectorSpy: TextInjecting {
     private(set) var capturedTargets: [TextInsertionTarget] = []
     private(set) var insertedTexts: [String] = []
     private(set) var discardedTargets: [TextInsertionTarget] = []
+    var anchorToReturn: CaretAnchor?
     private let log: EventLog?
 
     init(log: EventLog? = nil) { self.log = log }
@@ -489,6 +568,8 @@ private final class TextInjectorSpy: TextInjecting {
         capturedTargets.append(target)
         return target
     }
+
+    func anchor(for target: TextInsertionTarget) -> CaretAnchor? { anchorToReturn }
 
     @discardableResult
     func insert(_ text: String, into target: TextInsertionTarget) async throws -> InsertionOutcome {

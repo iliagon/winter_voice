@@ -11,6 +11,7 @@ final class DictationInteractor: DictationInteracting {
     private let behavior: DictationBehaviorProviding
     private let transcriptCopier: TranscriptCopying
     private let failureResetDelay: Duration
+    private let doneHoldDelay: Duration
     private var machine = DictationStateMachine()
     private var target: TextInsertionTarget?
     /// Decided when the session starts, so flipping the setting mid-recording
@@ -19,6 +20,7 @@ final class DictationInteractor: DictationInteracting {
     private var preparationTask: Task<Void, Never>?
     private var finishTask: Task<Void, Never>?
     private var failureResetTask: Task<Void, Never>?
+    private var doneResetTask: Task<Void, Never>?
     private var releasePending = false
 
     init(
@@ -30,7 +32,8 @@ final class DictationInteractor: DictationInteracting {
         history: HistoryRecording = NoopHistoryRecorder(),
         behavior: DictationBehaviorProviding = DefaultDictationBehavior(),
         transcriptCopier: TranscriptCopying = SystemTranscriptCopier(),
-        failureResetDelay: Duration = .seconds(4)
+        failureResetDelay: Duration = .seconds(4),
+        doneHoldDelay: Duration = .milliseconds(600)
     ) {
         self.relay = relay
         self.transcriber = transcriber
@@ -41,6 +44,7 @@ final class DictationInteractor: DictationInteracting {
         self.behavior = behavior
         self.transcriptCopier = transcriptCopier
         self.failureResetDelay = failureResetDelay
+        self.doneHoldDelay = doneHoldDelay
     }
 
     func beginPushToTalk() {
@@ -49,6 +53,13 @@ final class DictationInteractor: DictationInteracting {
         if case .failed = machine.state {
             failureResetTask?.cancel()
             failureResetTask = nil
+            move(to: .idle)
+        }
+        // A press while the confirmation is still showing starts the next
+        // dictation right away instead of waiting for the panel to fade.
+        if machine.state == .done {
+            doneResetTask?.cancel()
+            doneResetTask = nil
             move(to: .idle)
         }
         // A press while transcribing is the only escape from a long
@@ -91,7 +102,7 @@ final class DictationInteractor: DictationInteracting {
     /// in beginPushToTalk; during inserting the press is meaningless.
     func togglePushToTalk() {
         switch machine.state {
-        case .idle, .failed, .processing:
+        case .idle, .failed, .processing, .done:
             beginPushToTalk()
         case .preparing, .recording:
             endPushToTalk()
@@ -113,7 +124,7 @@ final class DictationInteractor: DictationInteracting {
                snapshot.microphone == .authorized,
                snapshot.inputMonitoring == .authorized,
                snapshot.accessibility == .authorized {
-                target = try injector.captureTarget()
+                try captureTarget()
             }
             try await requirePermission(.microphone)
             try await requirePermission(.inputMonitoring)
@@ -124,7 +135,7 @@ final class DictationInteractor: DictationInteracting {
                         recovery: "Open Settings and allow MacVoice in Privacy & Security → Accessibility."
                     )
                 }
-                if target == nil { target = try injector.captureTarget() }
+                if target == nil { try captureTarget() }
             }
             try await transcriber.start()
             move(to: .recording)
@@ -162,7 +173,7 @@ final class DictationInteractor: DictationInteracting {
                 injector.discard(target)
                 self.target = nil
             }
-            move(to: .idle)
+            confirmDone()
         } catch is CancellationError {
             fail(DictationFailure(
                 message: "Transcription canceled.",
@@ -170,6 +181,23 @@ final class DictationInteractor: DictationInteracting {
             ))
         } catch {
             fail(error)
+        }
+    }
+
+    private func captureTarget() throws {
+        let captured = try injector.captureTarget()
+        target = captured
+        relay.publish(anchor: injector.anchor(for: captured))
+    }
+
+    private func confirmDone() {
+        move(to: .done)
+        doneResetTask?.cancel()
+        let delay = doneHoldDelay
+        doneResetTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, let self, self.machine.state == .done else { return }
+            self.move(to: .idle)
         }
     }
 

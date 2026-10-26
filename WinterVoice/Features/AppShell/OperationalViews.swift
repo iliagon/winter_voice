@@ -130,8 +130,6 @@ struct HotkeyView: View {
                         mode: .toggle,
                         showsClear: false
                     )
-                    WVDivider().padding(.horizontal, 12)
-                    showWidgetRow
                 }
             }
 
@@ -212,26 +210,6 @@ struct HotkeyView: View {
                     }
                 }
             }
-        }
-        .padding(12)
-    }
-
-    private var showWidgetRow: some View {
-        HStack(alignment: .center, spacing: Theme.Space.sm) {
-            WVIconBadge(systemImage: "macwindow.on.rectangle")
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Show Widget")
-                    .font(.wvRowTitle)
-                    .foregroundStyle(Theme.textPrimary)
-                Text("Brings the floating pill to the front. Doesn't start recording.")
-                    .font(.wvCaption)
-                    .foregroundStyle(Theme.textSecondary)
-            }
-            Spacer(minLength: Theme.Space.md)
-            WVKeycapChord(keys: ["Cmd", "Shift", "Space"])
-            Text("Fixed")
-                .font(.wvCaption)
-                .foregroundStyle(Theme.textTertiary)
         }
         .padding(12)
     }

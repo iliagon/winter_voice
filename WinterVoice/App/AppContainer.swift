@@ -98,7 +98,9 @@ final class AppContainer {
                     relay.publish(.processing)
                     try? await Task.sleep(nanoseconds: 1_500_000_000)
                     relay.publish(.inserting)
-                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    relay.publish(.done)
+                    try? await Task.sleep(nanoseconds: 600_000_000)
                     relay.publish(.idle)
                     try? await Task.sleep(nanoseconds: 2_500_000_000)
                 }
@@ -119,14 +121,12 @@ final class AppContainer {
             binding: hotkeyBinding
         )
         self.hotkey = hotkey
-        let widgetPreferences = WidgetPreferences()
         shellPresenter = AppShellPresenter(
             dictationPresenter: presenter,
             router: router,
             providerConfiguration: providerConfiguration,
             history: history,
             hotkeyBinding: hotkeyBinding,
-            widgetPreferences: widgetPreferences,
             microphonePreferences: microphonePreferences,
             behaviorPreferences: behaviorPreferences,
             hotkeyCaptureSuspender: hotkey
@@ -141,13 +141,10 @@ final class AppContainer {
             presenter: presenter,
             hotkey: hotkey
         )
-        let panel = RecordingPanelController(
+        panelController = RecordingPanelController(
             presenter: presenter,
-            levelMeter: audioRecorder.levelMeter,
-            preferences: widgetPreferences
+            levelMeter: audioRecorder.levelMeter
         )
-        panelController = panel
-        hotkey.onShowWidget = { [weak panel] in panel?.showWidget() }
     }
 
     func start() {

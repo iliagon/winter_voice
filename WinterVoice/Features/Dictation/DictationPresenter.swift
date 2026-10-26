@@ -4,6 +4,7 @@ import Combine
 @MainActor
 final class DictationPresenter: ObservableObject {
     @Published private(set) var state: DictationState = .idle
+    @Published private(set) var anchor: CaretAnchor?
     @Published private(set) var permissions: PermissionSnapshot
     @Published private(set) var permissionRequest: PermissionRequestState = .idle
     @Published private(set) var hotkeyHealth: HotkeyHealth
@@ -36,6 +37,7 @@ final class DictationPresenter: ObservableObject {
         permissions = permissionManager.snapshot()
         hotkeyHealth = hotkeyRelay.health
         relay.$state.assign(to: &$state)
+        relay.$anchor.assign(to: &$anchor)
         hotkeyRelay.$health.assign(to: &$hotkeyHealth)
         hotkeyBinding.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
@@ -52,8 +54,9 @@ final class DictationPresenter: ObservableObject {
         case .idle: "Idle"
         case .preparing: "Preparing…"
         case .recording: "Recording…"
-        case .processing: "Processing on this Mac…"
+        case .processing: "Transcribing…"
         case .inserting: "Inserting…"
+        case .done: "Done"
         case .failed(let failure): failure.message
         }
     }

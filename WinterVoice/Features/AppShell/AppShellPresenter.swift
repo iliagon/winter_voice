@@ -7,7 +7,6 @@ final class AppShellPresenter: ObservableObject {
     let providerConfiguration: ProviderConfigurationStore
     let history: HistoryStore
     let hotkeyBinding: HotkeyBindingStore
-    let widgetPreferences: WidgetPreferences
     let microphonePreferences: MicrophonePreferences
     let behaviorPreferences: BehaviorPreferences
     let transcriptionSettings: TranscriptionSettingsController
@@ -21,7 +20,6 @@ final class AppShellPresenter: ObservableObject {
         providerConfiguration: ProviderConfigurationStore,
         history: HistoryStore,
         hotkeyBinding: HotkeyBindingStore,
-        widgetPreferences: WidgetPreferences = WidgetPreferences(),
         microphonePreferences: MicrophonePreferences = MicrophonePreferences(),
         behaviorPreferences: BehaviorPreferences = BehaviorPreferences(),
         hotkeyCaptureSuspender: HotkeyCaptureSuspending? = nil
@@ -31,7 +29,6 @@ final class AppShellPresenter: ObservableObject {
         self.providerConfiguration = providerConfiguration
         self.history = history
         self.hotkeyBinding = hotkeyBinding
-        self.widgetPreferences = widgetPreferences
         self.microphonePreferences = microphonePreferences
         self.behaviorPreferences = behaviorPreferences
         self.hotkeyCaptureSuspender = hotkeyCaptureSuspender

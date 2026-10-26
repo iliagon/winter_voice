@@ -6,6 +6,8 @@ enum DictationState: Equatable, Sendable {
     case recording
     case processing
     case inserting
+    /// The transcript landed; held briefly so the panel can confirm it.
+    case done
     case failed(DictationFailure)
 
     var isVisible: Bool { self != .idle }
@@ -44,7 +46,8 @@ struct DictationStateMachine {
              (.preparing, .recording),
              (.recording, .processing),
              (.processing, .inserting),
-             (.inserting, .idle),
+             (.inserting, .done),
+             (.done, .idle),
              (.failed, .idle):
             return true
         case (.idle, .failed),

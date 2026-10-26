@@ -220,6 +220,11 @@ final class SystemTextInjector: TextInjecting {
         return outcome
     }
 
+    func anchor(for target: TextInsertionTarget) -> CaretAnchor? {
+        guard let captured = targets[target.id] else { return nil }
+        return CaretLocator.anchor(for: captured.element)
+    }
+
     func discard(_ target: TextInsertionTarget) { targets[target.id] = nil }
 
     /// Confirms the captured application is still frontmost and resolves the

@@ -3,38 +3,26 @@ import SwiftUI
 import XCTest
 @testable import WinterVoice
 
-/// Renders every widget state to PNGs so layout changes can be reviewed
+/// Renders every panel phase to PNGs so layout changes can be reviewed
 /// without launching the app. Output lands in the directory named by the
 /// WIDGET_SNAPSHOT_DIR environment variable; the test is skipped when the
 /// variable is absent (normal CI runs).
 @MainActor
 final class WidgetSnapshotTests: XCTestCase {
-    func testRenderWidgetStates() throws {
+    func testRenderPanelPhases() throws {
         guard let path = ProcessInfo.processInfo.environment["WIDGET_SNAPSHOT_DIR"] else {
             throw XCTSkip("WIDGET_SNAPSHOT_DIR not set")
         }
         let outputDirectory = URL(fileURLWithPath: path, isDirectory: true)
         try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 
-        let relay = DictationStateRelay()
-        let presenter = DictationPresenter(
-            interactor: SnapshotInteractorFake(),
-            relay: relay,
-            hotkeyRelay: HotkeyHealthRelay(),
-            permissionManager: SnapshotPermissionFake(),
-            router: AppRouter()
-        )
+        let model = RecordingPanelModel()
+        model.isPresented = true
         let meter = AudioLevelMeter()
         meter.update(0.8)
 
-        func snap(_ name: String, style: WidgetStyle) throws {
-            let view = ZStack {
-                Color(red: 0.35, green: 0.42, blue: 0.55)
-                RecordingPanelView(presenter: presenter, levelMeter: meter, style: style)
-                    .padding(16)
-            }
-            .fixedSize()
-            let renderer = ImageRenderer(content: view)
+        func write(_ name: String, _ content: some View) throws {
+            let renderer = ImageRenderer(content: content.fixedSize())
             renderer.scale = 2
             guard let image = renderer.nsImage,
                   let tiff = image.tiffRepresentation,
@@ -43,55 +31,65 @@ final class WidgetSnapshotTests: XCTestCase {
                 XCTFail("Could not render \(name)")
                 return
             }
-            let url = outputDirectory.appendingPathComponent("\(name).png")
-            try png.write(to: url)
+            try png.write(to: outputDirectory.appendingPathComponent("\(name).png"))
             print("SNAPSHOT \(name): \(Int(image.size.width))x\(Int(image.size.height))")
         }
 
-        relay.publish(.idle)
-        try snap("idle-labeled", style: .labeled)
-        try snap("idle-icon", style: .icon)
-        try snap("idle-minimal", style: .minimal)
+        /// The panel at its real size over a fake text line, so the caret's
+        /// relation to the pill is visible.
+        func snap(_ name: String) throws {
+            let caretY: CGFloat = model.edge == .below
+                ? 0
+                : RecordingPanelController.panelSize.height + PanelPlacement.gap
+            let scene = ZStack(alignment: .topLeading) {
+                Color(red: 0.93, green: 0.93, blue: 0.95)
+                Text("Hello, this is a text field")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.black)
+                    .offset(x: 24, y: caretY + 2)
+                Rectangle()
+                    .fill(Color.blue)
+                    .frame(width: 1.5, height: 18)
+                    .offset(x: 40, y: caretY)
+                RecordingPanelView(model: model, levelMeter: meter, drawsCheckmarkInstantly: true)
+                    .frame(
+                        width: RecordingPanelController.panelSize.width,
+                        height: RecordingPanelController.panelSize.height
+                    )
+                    .offset(x: 40 - PanelPlacement.leadingInset, y: model.edge == .below ? 20 : 0)
+            }
+            .frame(width: 320, height: RecordingPanelController.panelSize.height + 40)
+            try write(name, scene)
+        }
 
-        relay.publish(.recording)
-        try snap("recording", style: .labeled)
-
-        relay.publish(.failed(DictationFailure(
-            message: "Microphone access denied.",
-            recovery: "Enable it in System Settings."
-        )))
-        try snap("error-short", style: .labeled)
-
-        relay.publish(.failed(DictationFailure(
-            message: "The transcription service could not be reached because the network connection appears to be offline right now.",
-            recovery: "Check your internet connection, verify the server URL in Settings, and then try dictating again."
-        )))
-        try snap("error-long", style: .labeled)
-
-        // The longest strings the app actually ships — these must render in
-        // full, unlike the synthetic overflow case above.
-        relay.publish(.failed(DictationFailure(
+        model.phase = .listening
+        try snap("1-listening")
+        model.phase = .transcribing
+        try snap("2-transcribing-arc")
+        try write("2-transcribing-dots", ZStack {
+            Color.black.opacity(0.85)
+            ProcessingIndicator(style: .dots).padding(12)
+        })
+        model.phase = .done
+        try snap("3-done")
+        model.phase = .failed(DictationFailure(
             message: "Remote transcription failed (HTTP 503).",
-            recovery: "whisper.cpp models begin with the ggml header. Download a ggml-*.bin model and try again."
-        )))
-        try snap("error-shipped-longest", style: .labeled)
-
-        relay.publish(.failed(DictationFailure(
-            message: "The remote provider returned an invalid response.",
             recovery: "Open Settings and allow MacVoice in Privacy & Security → Accessibility."
-        )))
-        try snap("error-shipped-wide", style: .labeled)
+        ))
+        try snap("4-failed")
+        model.edge = .above
+        model.phase = .listening
+        try snap("5-listening-above")
     }
 }
 
-/// The panel is a borderless window sized by hand from the SwiftUI content;
-/// if it lags the content, the failure card is squeezed into the idle pill's
-/// frame and its text truncates.
+/// The panel is a fixed-size click-through window placed next to the caret;
+/// it must appear for a session, sit by the published anchor, and go away
+/// when the session ends.
 @MainActor
-final class RecordingPanelSizingTests: XCTestCase {
-    func testPanelFrameTracksFailureCard() throws {
-        let suite = UserDefaults(suiteName: "recording-panel-sizing-tests")!
-        suite.removePersistentDomain(forName: "recording-panel-sizing-tests")
+final class RecordingPanelControllerTests: XCTestCase {
+    func testPanelAppearsBelowAnchorAndHidesWhenIdle() throws {
+        let screen = try XCTUnwrap(NSScreen.main).visibleFrame
         let relay = DictationStateRelay()
         let presenter = DictationPresenter(
             interactor: SnapshotInteractorFake(),
@@ -101,40 +99,62 @@ final class RecordingPanelSizingTests: XCTestCase {
             router: AppRouter()
         )
         let existing = Set(NSApp.windows.map(ObjectIdentifier.init))
-        let controller = RecordingPanelController(
-            presenter: presenter,
-            levelMeter: AudioLevelMeter(),
-            preferences: WidgetPreferences(defaults: suite),
-            defaults: suite
+        let controller = RecordingPanelController(presenter: presenter, levelMeter: AudioLevelMeter())
+        let panel = try XCTUnwrap(NSApp.windows.first { !existing.contains(ObjectIdentifier($0)) })
+        defer { panel.orderOut(nil) }
+
+        func settle(_ seconds: TimeInterval = 0.1) { RunLoop.main.run(until: Date().addingTimeInterval(seconds)) }
+
+        XCTAssertTrue(panel.ignoresMouseEvents)
+        XCTAssertFalse(panel.isVisible)
+
+        let caret = CGRect(x: screen.midX, y: screen.midY, width: 0, height: 18)
+        relay.publish(.preparing)
+        relay.publish(anchor: CaretAnchor(rect: caret, source: .caret))
+        settle()
+        XCTAssertTrue(panel.isVisible)
+        XCTAssertEqual(panel.frame.minX, caret.minX - PanelPlacement.leadingInset, accuracy: 0.5)
+        XCTAssertEqual(panel.frame.maxY, caret.minY - PanelPlacement.gap, accuracy: 0.5)
+        XCTAssertEqual(controller.model.edge, .below)
+        XCTAssertEqual(controller.model.phase, .listening)
+
+        relay.publish(.recording)
+        relay.publish(.processing)
+        settle()
+        XCTAssertEqual(controller.model.phase, .transcribing)
+        XCTAssertEqual(panel.frame.minX, caret.minX - PanelPlacement.leadingInset, accuracy: 0.5,
+                       "The panel must not move during a session")
+
+        relay.publish(.inserting)
+        relay.publish(.done)
+        settle()
+        XCTAssertEqual(controller.model.phase, .done)
+
+        relay.publish(.idle)
+        settle(0.4)
+        XCTAssertFalse(panel.isVisible)
+        XCTAssertFalse(controller.model.isPresented)
+    }
+
+    func testSessionWithoutAnchorFallsBackToPointer() throws {
+        let relay = DictationStateRelay()
+        let presenter = DictationPresenter(
+            interactor: SnapshotInteractorFake(),
+            relay: relay,
+            hotkeyRelay: HotkeyHealthRelay(),
+            permissionManager: SnapshotPermissionFake(),
+            router: AppRouter()
         )
+        let existing = Set(NSApp.windows.map(ObjectIdentifier.init))
+        let controller = RecordingPanelController(presenter: presenter, levelMeter: AudioLevelMeter())
         let panel = try XCTUnwrap(NSApp.windows.first { !existing.contains(ObjectIdentifier($0)) })
         defer { panel.orderOut(nil); _ = controller }
 
-        func settle() { RunLoop.main.run(until: Date().addingTimeInterval(0.3)) }
-        func assertPanelFitsContent(_ label: String, file: StaticString = #filePath, line: UInt = #line) throws {
-            let fitting = try XCTUnwrap(panel.contentView).fittingSize
-            XCTAssertEqual(panel.frame.width, fitting.width, accuracy: 1, label, file: file, line: line)
-            XCTAssertEqual(panel.frame.height, fitting.height, accuracy: 1, label, file: file, line: line)
-        }
-
-        settle()
-        try assertPanelFitsContent("idle")
-        let idleSize = panel.frame.size
-
-        relay.publish(.failed(DictationFailure(
-            message: "The remote provider returned an invalid response.",
-            recovery: "whisper.cpp models begin with the ggml header. Download a ggml-*.bin model and try again."
-        )))
-        settle()
-        try assertPanelFitsContent("failed")
-        XCTAssertGreaterThan(panel.frame.width, idleSize.width)
-        XCTAssertGreaterThan(panel.frame.height, idleSize.height)
-
-        relay.publish(.idle)
-        settle()
-        try assertPanelFitsContent("idle again")
-        XCTAssertEqual(panel.frame.width, idleSize.width, accuracy: 1)
-        XCTAssertEqual(panel.frame.height, idleSize.height, accuracy: 1)
+        relay.publish(.failed(DictationFailure(message: "No editable field is focused.", recovery: "Focus one.")))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertFalse(panel.isVisible, "The panel waits briefly for a caret before falling back")
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        XCTAssertTrue(panel.isVisible)
     }
 }
 

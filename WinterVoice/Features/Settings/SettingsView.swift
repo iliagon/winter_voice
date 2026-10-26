@@ -6,7 +6,7 @@ import SwiftUI
 // MARK: - In-app Settings page
 
 /// The consolidated Settings screen of the reference app: Transcription,
-/// Microphone, Behavior, Floating Widget, Permissions, and Privacy in one
+/// Microphone, Behavior, Theme, and Permissions in one
 /// scrollable page.
 struct AppSettingsView: View {
     @ObservedObject var presenter: AppShellPresenter
@@ -14,7 +14,6 @@ struct AppSettingsView: View {
 
     @ObservedObject private var controller: TranscriptionSettingsController
     @ObservedObject private var configuration: ProviderConfigurationStore
-    @ObservedObject private var widgetPreferences: WidgetPreferences
     @StateObject private var launchAtLogin = LaunchAtLoginModel()
     @ObservedObject private var theme = ThemeStore.shared
     @ObservedObject private var microphone: MicrophonePreferences
@@ -25,7 +24,6 @@ struct AppSettingsView: View {
         self.reopenOnboarding = reopenOnboarding
         _controller = ObservedObject(wrappedValue: presenter.transcriptionSettings)
         _configuration = ObservedObject(wrappedValue: presenter.providerConfiguration)
-        _widgetPreferences = ObservedObject(wrappedValue: presenter.widgetPreferences)
         _microphone = ObservedObject(wrappedValue: presenter.microphonePreferences)
         _behavior = ObservedObject(wrappedValue: presenter.behaviorPreferences)
     }
@@ -36,12 +34,11 @@ struct AppSettingsView: View {
         WVPage(
             icon: "gearshape",
             title: "Settings",
-            subtitle: "Transcription, widget, and permissions."
+            subtitle: "Transcription, microphone, and permissions."
         ) {
             transcriptionSection
             microphoneSection
             behaviorSection
-            widgetSection
             themeSection
             permissionsSection
         }
@@ -324,137 +321,6 @@ struct AppSettingsView: View {
         }
     }
 
-    // MARK: Floating widget
-
-    private var widgetSection: some View {
-        sectionCard("Floating Widget") {
-            settingRow(
-                title: "Show widget",
-                caption: visibilityCaption
-            ) {
-                WVChipPicker(
-                    selection: $widgetPreferences.visibility,
-                    options: WidgetVisibility.allCases,
-                    label: { $0.title },
-                    grouped: true
-                )
-            }
-            WVDivider()
-            settingRow(
-                title: "Follow cursor across monitors",
-                caption: "Jumps to the monitor your cursor is on."
-            ) {
-                Toggle("", isOn: $widgetPreferences.followsCursor)
-                    .toggleStyle(.wv)
-                    .labelsHidden()
-            }
-            WVDivider()
-            settingRow(
-                title: "Lock position",
-                caption: "Pin the pill above the dock and stop dragging."
-            ) {
-                Toggle("", isOn: $widgetPreferences.isLocked)
-                    .toggleStyle(.wv)
-                    .labelsHidden()
-            }
-            VStack(alignment: .leading, spacing: 8) {
-                Text("STYLE")
-                    .font(.wvOverline)
-                    .tracking(0.6)
-                    .foregroundStyle(Theme.textTertiary)
-                HStack(spacing: 12) {
-                    ForEach(WidgetStyle.allCases, id: \.self) { style in
-                        styleOptionCard(style)
-                    }
-                }
-                .padding(.top, 4)
-            }
-            Text("Drag the pill to move it. Press Cmd + Shift + Space to bring it to the front.")
-                .font(.wvCaption)
-                .foregroundStyle(Theme.textTertiary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private var visibilityCaption: String {
-        switch widgetPreferences.visibility {
-        case .always: "The pill stays on screen."
-        case .whileRecording: "Appears only while you record."
-        case .hidden: "The pill never appears."
-        }
-    }
-
-    /// One reference style tile: a bordered card holding a miniature of the
-    /// idle pill, with a check badge on the selected corner.
-    private func styleOptionCard(_ style: WidgetStyle) -> some View {
-        let selected = widgetPreferences.style == style
-        let shape = RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
-        return Button {
-            widgetPreferences.style = style
-        } label: {
-            stylePreviewPill(style)
-                .frame(maxWidth: .infinity, minHeight: 64)
-                .background(shape.fill(Theme.inset))
-                .overlay(
-                    shape.strokeBorder(
-                        selected ? Theme.chipSelectedBorder : Theme.border,
-                        lineWidth: selected ? 1.5 : 1
-                    )
-                )
-                .overlay(alignment: .topTrailing) {
-                    if selected {
-                        Circle()
-                            .fill(Theme.emphasis)
-                            .frame(width: 20, height: 20)
-                            .overlay(
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(Theme.textOnEmphasis)
-                            )
-                            .offset(x: 6, y: -6)
-                    }
-                }
-                .contentShape(shape)
-        }
-        .buttonStyle(.plain)
-        .focusEffectDisabled()
-        .padding(.top, 6)
-    }
-
-    /// Miniature of what the idle widget looks like in each style.
-    @ViewBuilder
-    private func stylePreviewPill(_ style: WidgetStyle) -> some View {
-        let pill = Capsule().fill(Color(hex: 0x0A0A0B))
-        let border = Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-        switch style {
-        case .labeled:
-            HStack(spacing: 6) {
-                WVBrandMark(size: 15)
-                Text("MacVoice")
-                    .font(.wv(11.5, .semibold))
-                    .foregroundStyle(.white)
-            }
-            .padding(.horizontal, 11)
-            .padding(.vertical, 6)
-            .background(pill)
-            .overlay(border)
-        case .icon:
-            WVBrandMark(size: 15)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(pill)
-                .overlay(border)
-        case .minimal:
-            Image(systemName: "waveform")
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.8))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .background(pill)
-                .overlay(border)
-        }
-    }
-
     /// A reference settings row: title + caption on the left, the control on
     /// the right edge of the card.
     private func settingRow(
@@ -662,7 +528,7 @@ struct SettingsView: View {
                     Text("MacVoice")
                         .font(.wvTitle)
                         .foregroundStyle(Theme.textPrimary)
-                    Text("Configure permissions here. Transcription, shortcuts, and the widget are managed in the main MacVoice window.")
+                    Text("Configure permissions here. Transcription and shortcuts are managed in the main MacVoice window.")
                         .font(.wvBody)
                         .foregroundStyle(Theme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)

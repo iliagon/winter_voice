@@ -2,100 +2,68 @@ import AppKit
 import Combine
 import SwiftUI
 
-/// When the floating pill is on screen — the reference "Show widget" setting.
-enum WidgetVisibility: String, CaseIterable, Codable, Sendable {
-    case always
-    case whileRecording
-    case hidden
+/// What the panel is showing. Several dictation states share one look:
+/// preparing joins listening so holding the key gives instant feedback, and
+/// inserting joins done so the checkmark is drawn as soon as the transcript
+/// arrives.
+@MainActor
+final class RecordingPanelModel: ObservableObject {
+    enum Phase: Equatable {
+        case listening
+        case transcribing
+        case done
+        case failed(DictationFailure)
+    }
 
-    var title: String {
-        switch self {
-        case .always: "Always"
-        case .whileRecording: "Recording"
-        case .hidden: "Hidden"
+    /// Which side of the caret the panel sits on; the content hugs that side.
+    enum Edge {
+        case below
+        case above
+    }
+
+    @Published var phase: Phase = .listening
+    @Published var edge: Edge = .below
+    /// Drives the pop-in and fade-out; the window itself stays opaque.
+    @Published var isPresented = false
+
+    static func phase(for state: DictationState) -> Phase? {
+        switch state {
+        case .idle: nil
+        case .preparing, .recording: .listening
+        case .processing: .transcribing
+        case .inserting, .done: .done
+        case .failed(let failure): .failed(failure)
         }
     }
 }
 
-/// Visual treatment of the idle pill — the reference "Style" picker.
-enum WidgetStyle: String, CaseIterable, Codable, Sendable {
-    /// Logo tile plus the wordmark.
-    case labeled
-    /// Logo tile only.
-    case icon
-    /// A tiny glyph-only pill.
-    case minimal
-}
-
-/// Persisted preferences for the floating widget, shared between the Settings
-/// screen and the panel controller.
-@MainActor
-final class WidgetPreferences: ObservableObject {
-    @Published var visibility: WidgetVisibility {
-        didSet { defaults.set(visibility.rawValue, forKey: Self.visibilityKey) }
-    }
-    @Published var style: WidgetStyle {
-        didSet { defaults.set(style.rawValue, forKey: Self.styleKey) }
-    }
-    /// Jump to the monitor the cursor is on whenever the pill is shown.
-    @Published var followsCursor: Bool {
-        didSet { defaults.set(followsCursor, forKey: Self.followsCursorKey) }
-    }
-    /// Pin the pill above the dock and ignore dragging.
-    @Published var isLocked: Bool {
-        didSet { defaults.set(isLocked, forKey: Self.lockedKey) }
-    }
-
-    private static let visibilityKey = "widget.visibility"
-    private static let styleKey = "widget.style"
-    private static let followsCursorKey = "widget.followsCursor"
-    private static let lockedKey = "widget.locked"
-    private let defaults: UserDefaults
-
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
-        visibility = defaults.string(forKey: Self.visibilityKey)
-            .flatMap(WidgetVisibility.init(rawValue:)) ?? .always
-        style = defaults.string(forKey: Self.styleKey)
-            .flatMap(WidgetStyle.init(rawValue:)) ?? .labeled
-        followsCursor = defaults.bool(forKey: Self.followsCursorKey)
-        isLocked = defaults.bool(forKey: Self.lockedKey)
-    }
-}
-
+/// Shows the dictation panel next to the text caret for the length of one
+/// session. The panel is a fixed-size, click-through, non-activating window:
+/// it never takes focus from the field being dictated into, and the pill
+/// inside it resizes with a SwiftUI animation instead of window resizing.
 @MainActor
 final class RecordingPanelController {
-    private static let originXKey = "recordingPanel.origin.x"
-    private static let originYKey = "recordingPanel.origin.y"
+    /// Large enough for the widest content, the failure card.
+    static let panelSize = CGSize(width: 264, height: 120)
+    /// How long a session waits for the caret before using the pointer.
+    static let anchorWaitLimit: Duration = .milliseconds(150)
+    private static let fadeOutDuration: TimeInterval = 0.18
 
+    let model = RecordingPanelModel()
     private let panel: NSPanel
-    private let hostingView: NSHostingView<RecordingPanelView>
-    private let defaults: UserDefaults
-    private let preferences: WidgetPreferences
     private let presenter: DictationPresenter
-    private let levelMeter: AudioLevelMeter
-    private var hasPositioned = false
-    /// Cursor-to-origin offset captured at drag start; nil when not dragging.
-    private var dragOffset: NSPoint?
-    private var latestState: DictationState = .idle
-    private var visibility: WidgetVisibility
-    private var style: WidgetStyle
+    /// A session is running: the dictation state is anything but idle.
+    private var isSessionActive = false
+    /// The panel has been positioned and shown for the current session.
+    private var isShown = false
+    private var anchorWaitTask: Task<Void, Never>?
+    private var hideTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
-    init(
-        presenter: DictationPresenter,
-        levelMeter: AudioLevelMeter,
-        preferences: WidgetPreferences = WidgetPreferences(),
-        defaults: UserDefaults = .standard
-    ) {
-        self.preferences = preferences
+    init(presenter: DictationPresenter, levelMeter: AudioLevelMeter) {
         self.presenter = presenter
-        self.levelMeter = levelMeter
-        visibility = preferences.visibility
-        style = preferences.style
-        self.defaults = defaults
         panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 120, height: 80),
+            contentRect: NSRect(origin: .zero, size: Self.panelSize),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -104,180 +72,95 @@ final class RecordingPanelController {
         panel.isFloatingPanel = true
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = true
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.ignoresMouseEvents = true
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         panel.isOpaque = false
         panel.backgroundColor = .clear
         // An NSWindow shadow around a transparent canvas would draw a visible
         // rectangle, so the pill renders shadowless.
         panel.hasShadow = false
-        let hosting = NSHostingView(
-            rootView: RecordingPanelView(presenter: presenter, levelMeter: levelMeter)
+        panel.contentView = NSHostingView(
+            rootView: RecordingPanelView(model: model, levelMeter: levelMeter)
         )
-        hostingView = hosting
-        panel.contentView = hosting
-        applyRootView()
-        // `@Published` emits from willSet, so a synchronous sink would measure
-        // `fittingSize` while the view still shows the previous state and
-        // leave the panel one state behind — an idle-pill-sized window around
-        // the failure card. Hopping to the next main-queue turn sizes the
-        // panel for the state actually on screen.
+        // `@Published` emits from willSet; hopping to the next main-queue turn
+        // makes the presenter's state and anchor agree when they are read.
         presenter.$state
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] state in
-                self?.latestState = state
-                self?.render()
-            }
+            .sink { [weak self] state in self?.stateChanged(state) }
             .store(in: &cancellables)
-        preferences.$visibility
-            .sink { [weak self] visibility in
-                self?.visibility = visibility
-                self?.render()
-            }
-            .store(in: &cancellables)
-        preferences.$style
-            .sink { [weak self] style in
-                self?.style = style
-                self?.applyRootView()
-                self?.render()
-            }
-            .store(in: &cancellables)
-        preferences.$isLocked
-            .dropFirst()
-            .sink { [weak self] locked in
-                guard let self else { return }
-                if locked, panel.isVisible { pinAboveDock() }
-            }
+        presenter.$anchor
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] anchor in self?.anchorChanged(anchor) }
             .store(in: &cancellables)
     }
 
-    /// Reassigning the root view (instead of observing preferences inside it)
-    /// keeps `fittingSize` deterministic when the style changes.
-    private func applyRootView() {
-        hostingView.rootView = RecordingPanelView(
-            presenter: presenter,
-            levelMeter: levelMeter,
-            style: style,
-            onToggle: { [presenter] in presenter.toggleDictation() },
-            onDragMoved: { [weak self] in self?.dragMoved() },
-            onDragEnded: { [weak self] in self?.dragEnded() }
-        )
-    }
-
-    /// Bring the pill to the front without changing state — the fixed
-    /// Cmd+Shift+Space shortcut. Ignored while the widget is set to Hidden.
-    func showWidget() {
-        guard visibility != .hidden else { return }
-        present()
-    }
-
-    private func render() {
-        let visible: Bool
-        switch visibility {
-        case .always: visible = true
-        case .whileRecording: visible = latestState != .idle
-        case .hidden: visible = false
-        }
-        guard visible else {
-            panel.orderOut(nil)
+    private func stateChanged(_ state: DictationState) {
+        guard let phase = RecordingPanelModel.phase(for: state) else {
+            endSession()
             return
         }
-        present()
+        model.phase = phase
+        guard !isSessionActive else { return }
+        isSessionActive = true
+        if let anchor = presenter.anchor {
+            present(at: anchor)
+        } else {
+            // The field is captured off the event-tap callback, a few
+            // milliseconds after the press. Sessions that never capture one
+            // (copy mode, early failures) fall back to the pointer.
+            anchorWaitTask = Task { [weak self] in
+                try? await Task.sleep(for: Self.anchorWaitLimit)
+                guard !Task.isCancelled, let self, self.isSessionActive, !self.isShown else { return }
+                self.present(at: CaretLocator.pointerAnchor(at: NSEvent.mouseLocation))
+            }
+        }
     }
 
-    private func present() {
-        fitToContent()
-        if !hasPositioned {
-            positionInitially()
-            hasPositioned = true
-        }
-        if preferences.isLocked {
-            pinAboveDock()
-        } else if preferences.followsCursor,
-                  let target = cursorScreen(),
-                  panel.screen?.frame != target.frame {
-            dockBottomCenter(of: target)
-        }
+    private func anchorChanged(_ anchor: CaretAnchor?) {
+        guard isSessionActive, !isShown, let anchor else { return }
+        present(at: anchor)
+    }
+
+    /// The panel stays where it first appeared for the whole session, even
+    /// if the caret moves, so it never chases the text being inserted.
+    private func present(at anchor: CaretAnchor) {
+        anchorWaitTask?.cancel()
+        anchorWaitTask = nil
+        hideTask?.cancel()
+        hideTask = nil
+        isShown = true
+        let origin = PanelPlacement.origin(
+            for: Self.panelSize,
+            anchor: anchor.rect,
+            visibleFrames: NSScreen.screens.map(\.visibleFrame)
+        )
+        panel.setFrameOrigin(origin)
+        model.edge = origin.y >= anchor.rect.maxY ? .above : .below
+        model.isPresented = false
         panel.orderFrontRegardless()
-    }
-
-    /// The screen currently under the mouse cursor.
-    private func cursorScreen() -> NSScreen? {
-        let mouse = NSEvent.mouseLocation
-        return NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) }
-    }
-
-    /// Snap to the bottom-center of the relevant screen, just above the dock.
-    private func pinAboveDock() {
-        let screen = (preferences.followsCursor ? cursorScreen() : nil)
-            ?? panel.screen ?? NSScreen.main ?? NSScreen.screens.first
-        guard let screen else { return }
-        dockBottomCenter(of: screen)
-    }
-
-    private func dockBottomCenter(of screen: NSScreen) {
-        let frame = screen.visibleFrame
-        let size = panel.frame.size
-        panel.setFrameOrigin(NSPoint(x: frame.midX - size.width / 2, y: frame.minY + 12))
-    }
-
-    private func fitToContent() {
-        let size = hostingView.fittingSize
-        guard size.width > 0, size.height > 0 else { return }
-        // Keep the pill anchored at its bottom-center while the size changes.
-        let anchor = NSPoint(x: panel.frame.midX, y: panel.frame.minY)
-        panel.setContentSize(size)
-        panel.setFrameOrigin(NSPoint(x: anchor.x - size.width / 2, y: anchor.y))
-    }
-
-    private func positionInitially() {
-        if let saved = savedOrigin(), originIsVisible(saved) {
-            panel.setFrameOrigin(saved)
-            return
+        // Present on the next turn so the pop-in animates from the hidden
+        // state the window was just ordered in with.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isShown else { return }
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
+                self.model.isPresented = true
+            }
         }
-        let screen = NSScreen.main ?? NSScreen.screens.first
-        guard let frame = screen?.visibleFrame else { return }
-        let size = panel.frame.size
-        panel.setFrameOrigin(NSPoint(x: frame.midX - size.width / 2, y: frame.minY + 12))
     }
 
-    /// Pin the window to the cursor using screen coordinates. Gesture
-    /// translations are window-relative and the window moves mid-gesture,
-    /// which makes delta-based dragging jitter; the global mouse location
-    /// has no such feedback loop, so the pill stays glued to the cursor.
-    private func dragMoved() {
-        guard !preferences.isLocked else { return }
-        let mouse = NSEvent.mouseLocation
-        if dragOffset == nil {
-            let origin = panel.frame.origin
-            dragOffset = NSPoint(x: mouse.x - origin.x, y: mouse.y - origin.y)
+    private func endSession() {
+        isSessionActive = false
+        anchorWaitTask?.cancel()
+        anchorWaitTask = nil
+        guard isShown else { return }
+        isShown = false
+        withAnimation(.easeOut(duration: Self.fadeOutDuration)) {
+            model.isPresented = false
         }
-        guard let offset = dragOffset else { return }
-        panel.setFrameOrigin(NSPoint(x: mouse.x - offset.x, y: mouse.y - offset.y))
-    }
-
-    private func dragEnded() {
-        dragOffset = nil
-        persistPosition()
-    }
-
-    private func persistPosition() {
-        guard !preferences.isLocked else { return }
-        defaults.set(Double(panel.frame.origin.x), forKey: Self.originXKey)
-        defaults.set(Double(panel.frame.origin.y), forKey: Self.originYKey)
-    }
-
-    private func savedOrigin() -> NSPoint? {
-        guard defaults.object(forKey: Self.originXKey) != nil,
-              defaults.object(forKey: Self.originYKey) != nil else { return nil }
-        return NSPoint(
-            x: defaults.double(forKey: Self.originXKey),
-            y: defaults.double(forKey: Self.originYKey)
-        )
-    }
-
-    private func originIsVisible(_ origin: NSPoint) -> Bool {
-        NSScreen.screens.contains { screen in
-            screen.visibleFrame.insetBy(dx: -40, dy: -40).contains(origin)
+        hideTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Self.fadeOutDuration + 0.02))
+            guard !Task.isCancelled, let self, !self.isShown else { return }
+            self.panel.orderOut(nil)
         }
     }
 }
