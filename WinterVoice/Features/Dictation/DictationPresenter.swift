@@ -5,6 +5,7 @@ import Combine
 final class DictationPresenter: ObservableObject {
     @Published private(set) var state: DictationState = .idle
     @Published private(set) var anchor: CaretAnchor?
+    @Published private(set) var delivery: DictationDelivery = .inserted
     @Published private(set) var permissions: PermissionSnapshot
     @Published private(set) var permissionRequest: PermissionRequestState = .idle
     @Published private(set) var hotkeyHealth: HotkeyHealth
@@ -38,6 +39,7 @@ final class DictationPresenter: ObservableObject {
         hotkeyHealth = hotkeyRelay.health
         relay.$state.assign(to: &$state)
         relay.$anchor.assign(to: &$anchor)
+        relay.$delivery.assign(to: &$delivery)
         hotkeyRelay.$health.assign(to: &$hotkeyHealth)
         hotkeyBinding.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
@@ -113,7 +115,9 @@ final class DictationPresenter: ObservableObject {
         let generation = activationRefreshGeneration
 
         refreshPermissions()
-        guard OnboardingProgress(permissions: permissions) != .ready else { return }
+        // Poll until every grant lands, not just the required one: optional
+        // grants made in System Settings also settle with a delay.
+        guard !permissions.isFullyAuthorized else { return }
 
         let permissionManager = permissionManager
         activationRefreshTask = Task { [weak self] in
@@ -130,7 +134,7 @@ final class DictationPresenter: ObservableObject {
 
                 let snapshot = permissionManager.snapshot()
                 self.permissions = snapshot
-                if OnboardingProgress(permissions: snapshot) == .ready {
+                if snapshot.isFullyAuthorized {
                     break
                 }
             }

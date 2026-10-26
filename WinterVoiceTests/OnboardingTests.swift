@@ -16,25 +16,26 @@ final class OnboardingTests: XCTestCase {
         XCTAssertEqual(wizard.currentPermission, .inputMonitoring)
     }
 
-    func testProgressSelectsFirstMissingPermissionInSetupOrder() {
-        let permissions = snapshot(
-            microphone: .authorized,
-            inputMonitoring: .denied,
-            accessibility: .authorized
-        )
-
+    func testProgressOnlyWaitsForTheMicrophone() {
         XCTAssertEqual(
-            OnboardingProgress(permissions: permissions),
-            .needsPermission(.inputMonitoring)
+            OnboardingProgress(permissions: snapshot(microphone: .denied)),
+            .needsPermission(.microphone)
+        )
+        XCTAssertEqual(
+            OnboardingProgress(permissions: snapshot(inputMonitoring: .denied, accessibility: .denied)),
+            .ready,
+            "Input Monitoring and Accessibility are optional: the toggle shortcut and clipboard delivery cover them"
         )
     }
 
-    func testProgressIsReadyOnlyWhenEveryPermissionIsAuthorized() {
+    func testProgressIsReadyWhenEveryPermissionIsAuthorized() {
         XCTAssertEqual(OnboardingProgress(permissions: authorizedSnapshot), .ready)
-        XCTAssertNotEqual(
-            OnboardingProgress(permissions: snapshot(accessibility: .denied)),
-            .ready
-        )
+    }
+
+    func testOptionalPermissionsExplainWhatStillWorks() {
+        XCTAssertNil(AppPermission.microphone.limitationWithout)
+        XCTAssertNotNil(AppPermission.inputMonitoring.limitationWithout)
+        XCTAssertNotNil(AppPermission.accessibility.limitationWithout)
     }
 
     func testIncompletePermissionsCannotPersistCompletion() {
@@ -75,12 +76,16 @@ final class OnboardingTests: XCTestCase {
         XCTAssertTrue(subject.shouldPresentOnLaunch(permissions: authorizedSnapshot))
     }
 
-    func testCompletedSetupPresentsAgainWhenPermissionsWereRevoked() {
+    func testCompletedSetupPresentsAgainOnlyWhenARequiredPermissionWasRevoked() {
         let store = CompletionStoreSpy(isComplete: true)
         let subject = OnboardingInteractor(completionStore: store)
 
         XCTAssertFalse(subject.shouldPresentOnLaunch(permissions: authorizedSnapshot))
-        XCTAssertTrue(subject.shouldPresentOnLaunch(permissions: snapshot(accessibility: .denied)))
+        XCTAssertTrue(subject.shouldPresentOnLaunch(permissions: snapshot(microphone: .denied)))
+        XCTAssertFalse(
+            subject.shouldPresentOnLaunch(permissions: snapshot(accessibility: .denied)),
+            "Optional grants may be impossible without an administrator; they must not reopen setup on every launch"
+        )
     }
 
     private var authorizedSnapshot: PermissionSnapshot {

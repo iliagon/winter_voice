@@ -61,6 +61,8 @@ struct AppShellView: View {
             HotkeyView(
                 presenter: presenter.dictationPresenter,
                 binding: presenter.hotkeyBinding,
+                toggleStore: presenter.toggleShortcutStore,
+                toggleShortcut: presenter.toggleShortcut,
                 captureSuspender: presenter.hotkeyCaptureSuspender
             )
         case .settings:

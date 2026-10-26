@@ -28,6 +28,10 @@ struct MenuBarView: View {
 
         Divider()
 
+        Button(dictationMenuTitle) { presenter.toggleDictation() }
+
+        Divider()
+
         Button("Open MacVoice") {
             openMainWindow()
         }
@@ -45,6 +49,16 @@ struct MenuBarView: View {
 
         Button("Quit MacVoice") { presenter.quit() }
             .keyboardShortcut("q")
+    }
+
+    /// A menu click starts or stops a session the same way the toggle
+    /// shortcut does, so dictation is reachable even with no hot key at all.
+    private var dictationMenuTitle: String {
+        let shortcut = shellPresenter.toggleShortcutStore.binding.map { " (\($0.title))" } ?? ""
+        switch presenter.state {
+        case .preparing, .recording: return "Stop Dictation" + shortcut
+        default: return "Start Dictation" + shortcut
+        }
     }
 
     private func openMainWindow() {

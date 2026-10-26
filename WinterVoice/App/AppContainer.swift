@@ -23,6 +23,7 @@ final class AppContainer {
     let history: HistoryStore
     let hotkeyBinding: HotkeyBindingStore
     private let hotkey: RightOptionEventTap
+    private let toggleShortcut: CarbonToggleShortcut
     private let permissionHotkeyReconciler: PermissionHotkeyReconciler
     private let panelController: RecordingPanelController
     private let recordingFeedback: RecordingSessionFeedback
@@ -121,6 +122,13 @@ final class AppContainer {
             binding: hotkeyBinding
         )
         self.hotkey = hotkey
+        let toggleShortcutStore = ToggleShortcutStore()
+        let toggleShortcut = CarbonToggleShortcut(
+            interactor: interactor,
+            store: toggleShortcutStore,
+            primary: hotkeyBinding
+        )
+        self.toggleShortcut = toggleShortcut
         shellPresenter = AppShellPresenter(
             dictationPresenter: presenter,
             router: router,
@@ -129,7 +137,9 @@ final class AppContainer {
             hotkeyBinding: hotkeyBinding,
             microphonePreferences: microphonePreferences,
             behaviorPreferences: behaviorPreferences,
-            hotkeyCaptureSuspender: hotkey
+            toggleShortcutStore: toggleShortcutStore,
+            toggleShortcut: toggleShortcut,
+            hotkeyCaptureSuspender: HotkeyCaptureSuspenders([hotkey, toggleShortcut])
         )
         onboardingPresenter = OnboardingPresenter(
             dictationPresenter: presenter,

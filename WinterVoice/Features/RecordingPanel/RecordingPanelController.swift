@@ -22,6 +22,8 @@ final class RecordingPanelModel: ObservableObject {
     }
 
     @Published var phase: Phase = .listening
+    /// The transcript went to the clipboard; the done pill says so.
+    @Published var isCopied = false
     @Published var edge: Edge = .below
     /// Drives the pop-in and fade-out; the window itself stays opaque.
     @Published var isPresented = false
@@ -99,6 +101,7 @@ final class RecordingPanelController {
             endSession()
             return
         }
+        if phase == .done { model.isCopied = presenter.delivery == .copied }
         model.phase = phase
         guard !isSessionActive else { return }
         isSessionActive = true

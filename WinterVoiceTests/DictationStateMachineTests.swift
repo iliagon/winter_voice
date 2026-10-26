@@ -386,6 +386,32 @@ final class NoProviderDictationTests: XCTestCase {
         XCTAssertTrue(injector.insertedTexts.isEmpty, "Copy mode must never inject text")
     }
 
+    func testMissingAccessibilityFallsBackToClipboardAndSaysSo() async {
+        let relay = DictationStateRelay()
+        let transcriber = ReadyTranscriberSpy()
+        transcriber.stopResult = "no admin here"
+        let injector = TextInjectorSpy()
+        let copier = TranscriptCopierSpy()
+        let subject = DictationInteractor(
+            relay: relay,
+            transcriber: transcriber,
+            injector: injector,
+            permissions: NoAdminPermissionManagerSpy(),
+            transcriptCopier: copier,
+            copiedHoldDelay: .milliseconds(10)
+        )
+
+        subject.togglePushToTalk()
+        await waitUntil { relay.state == .recording }
+        subject.togglePushToTalk()
+        await waitUntil { relay.state == .done }
+
+        XCTAssertEqual(relay.delivery, .copied)
+        XCTAssertEqual(copier.copiedTexts, ["no admin here"])
+        XCTAssertEqual(injector.captureCallCount, 0)
+        await waitUntil { relay.state == .idle }
+    }
+
     func testCopyModeFailedCopySurfacesAsDictationFailure() async {
         let relay = DictationStateRelay()
         let transcriber = ReadyTranscriberSpy()
@@ -431,6 +457,18 @@ private final class TranscriptCopierSpy: TranscriptCopying {
 
 /// Microphone and Input Monitoring granted, Accessibility denied — the exact
 /// posture copy mode must work in.
+/// A Mac without an administrator: only the microphone could be granted.
+@MainActor
+private final class NoAdminPermissionManagerSpy: PermissionManaging {
+    func snapshot() -> PermissionSnapshot {
+        PermissionSnapshot(microphone: .authorized, inputMonitoring: .denied, accessibility: .denied)
+    }
+
+    func request(_ permission: AppPermission) async -> PermissionStatus {
+        snapshot()[permission]
+    }
+}
+
 @MainActor
 private final class MicOnlyPermissionManagerSpy: PermissionManaging {
     func snapshot() -> PermissionSnapshot {

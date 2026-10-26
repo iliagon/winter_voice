@@ -12,6 +12,7 @@ final class DictationInteractor: DictationInteracting {
     private let transcriptCopier: TranscriptCopying
     private let failureResetDelay: Duration
     private let doneHoldDelay: Duration
+    private let copiedHoldDelay: Duration
     private var machine = DictationStateMachine()
     private var target: TextInsertionTarget?
     /// Decided when the session starts, so flipping the setting mid-recording
@@ -33,7 +34,8 @@ final class DictationInteractor: DictationInteracting {
         behavior: DictationBehaviorProviding = DefaultDictationBehavior(),
         transcriptCopier: TranscriptCopying = SystemTranscriptCopier(),
         failureResetDelay: Duration = .seconds(4),
-        doneHoldDelay: Duration = .milliseconds(600)
+        doneHoldDelay: Duration = .milliseconds(600),
+        copiedHoldDelay: Duration = .milliseconds(1600)
     ) {
         self.relay = relay
         self.transcriber = transcriber
@@ -45,6 +47,7 @@ final class DictationInteractor: DictationInteracting {
         self.transcriptCopier = transcriptCopier
         self.failureResetDelay = failureResetDelay
         self.doneHoldDelay = doneHoldDelay
+        self.copiedHoldDelay = copiedHoldDelay
     }
 
     func beginPushToTalk() {
@@ -114,29 +117,23 @@ final class DictationInteractor: DictationInteracting {
     private func prepareAndRecord() async {
         do {
             // Copy mode never touches the focused field, so it needs neither
-            // Accessibility nor a captured target.
+            // Accessibility nor a captured target. Without Accessibility nothing
+            // can be typed into another app, so the transcript goes to the
+            // clipboard instead: dictation keeps working on Macs where that
+            // grant needs an administrator. Input Monitoring is not checked
+            // here — only the Fn listener needs it, and the toggle shortcut
+            // starts sessions without it.
+            let snapshot = permissions.snapshot()
             usesClipboardDelivery = behavior.copiesInsteadOfInserting
+                || snapshot.accessibility != .authorized
             // Capture the focused field as close to the key press as possible,
             // but never synchronously inside the event-tap callback: AX lookups
             // are IPC into the focused app and can stall past the tap watchdog.
-            let snapshot = permissions.snapshot()
-            if !usesClipboardDelivery,
-               snapshot.microphone == .authorized,
-               snapshot.inputMonitoring == .authorized,
-               snapshot.accessibility == .authorized {
+            if !usesClipboardDelivery, snapshot.microphone == .authorized {
                 try captureTarget()
             }
             try await requirePermission(.microphone)
-            try await requirePermission(.inputMonitoring)
-            if !usesClipboardDelivery {
-                guard permissions.snapshot().accessibility == .authorized else {
-                    throw DictationFailure(
-                        message: "Accessibility permission is required.",
-                        recovery: "Open Settings and allow MacVoice in Privacy & Security → Accessibility."
-                    )
-                }
-                if target == nil { try captureTarget() }
-            }
+            if !usesClipboardDelivery, target == nil { try captureTarget() }
             try await transcriber.start()
             move(to: .recording)
             if releasePending { await finishDictation() }
@@ -164,6 +161,7 @@ final class DictationInteractor: DictationInteracting {
                     )
                 }
                 history.record(text: text)
+                relay.publish(delivery: .copied)
             } else if let target {
                 let outcome = try await injector.insert(text, into: target)
                 // Text dictated into a password field must never reach History.
@@ -172,6 +170,7 @@ final class DictationInteractor: DictationInteracting {
                 }
                 injector.discard(target)
                 self.target = nil
+                relay.publish(delivery: .inserted)
             }
             confirmDone()
         } catch is CancellationError {
@@ -190,10 +189,12 @@ final class DictationInteractor: DictationInteracting {
         relay.publish(anchor: injector.anchor(for: captured))
     }
 
+    /// A copied transcript holds the confirmation longer: the panel tells
+    /// the user to paste it themselves.
     private func confirmDone() {
         move(to: .done)
         doneResetTask?.cancel()
-        let delay = doneHoldDelay
+        let delay = relay.delivery == .copied ? copiedHoldDelay : doneHoldDelay
         doneResetTask = Task { [weak self] in
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled, let self, self.machine.state == .done else { return }

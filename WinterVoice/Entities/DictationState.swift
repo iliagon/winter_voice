@@ -13,6 +13,14 @@ enum DictationState: Equatable, Sendable {
     var isVisible: Bool { self != .idle }
 }
 
+/// How the last transcript reached the user.
+enum DictationDelivery: Equatable, Sendable {
+    /// Typed into the focused field.
+    case inserted
+    /// Left on the clipboard for the user to paste.
+    case copied
+}
+
 struct DictationFailure: Error, Equatable, Sendable {
     let message: String
     let recovery: String

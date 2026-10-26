@@ -10,6 +10,8 @@ final class AppShellPresenter: ObservableObject {
     let microphonePreferences: MicrophonePreferences
     let behaviorPreferences: BehaviorPreferences
     let transcriptionSettings: TranscriptionSettingsController
+    let toggleShortcutStore: ToggleShortcutStore
+    let toggleShortcut: CarbonToggleShortcut?
     let hotkeyCaptureSuspender: HotkeyCaptureSuspending?
     private let router: AppRouter
     private var cancellables = Set<AnyCancellable>()
@@ -22,6 +24,8 @@ final class AppShellPresenter: ObservableObject {
         hotkeyBinding: HotkeyBindingStore,
         microphonePreferences: MicrophonePreferences = MicrophonePreferences(),
         behaviorPreferences: BehaviorPreferences = BehaviorPreferences(),
+        toggleShortcutStore: ToggleShortcutStore = ToggleShortcutStore(),
+        toggleShortcut: CarbonToggleShortcut? = nil,
         hotkeyCaptureSuspender: HotkeyCaptureSuspending? = nil
     ) {
         self.dictationPresenter = dictationPresenter
@@ -31,6 +35,8 @@ final class AppShellPresenter: ObservableObject {
         self.hotkeyBinding = hotkeyBinding
         self.microphonePreferences = microphonePreferences
         self.behaviorPreferences = behaviorPreferences
+        self.toggleShortcutStore = toggleShortcutStore
+        self.toggleShortcut = toggleShortcut
         self.hotkeyCaptureSuspender = hotkeyCaptureSuspender
         transcriptionSettings = TranscriptionSettingsController(configuration: providerConfiguration)
         selection = router.selection

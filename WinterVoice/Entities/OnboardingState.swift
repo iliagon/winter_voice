@@ -4,9 +4,11 @@ enum OnboardingProgress: Equatable, Sendable {
     case needsPermission(AppPermission)
     case ready
 
+    /// Setup is ready once every required permission is granted; optional
+    /// ones only unlock Fn and in-place insertion.
     init(permissions: PermissionSnapshot) {
         if let permission = AppPermission.allCases.first(where: {
-            permissions[$0] != .authorized
+            $0.isRequired && permissions[$0] != .authorized
         }) {
             self = .needsPermission(permission)
         } else {

@@ -42,7 +42,42 @@ struct OverviewView: View {
                 }
             }
 
+            limitedModeNote
+
             recentActivity
+        }
+    }
+
+    /// Optional permissions that are missing, with what still works instead.
+    private var missingOptionalPermissions: [AppPermission] {
+        AppPermission.allCases.filter {
+            !$0.isRequired && dictationPresenter.permissions[$0] != .authorized
+        }
+    }
+
+    @ViewBuilder
+    private var limitedModeNote: some View {
+        if permissionsReady, !missingOptionalPermissions.isEmpty {
+            WVCard {
+                HStack(alignment: .top, spacing: Theme.Space.sm) {
+                    WVIconBadge(systemImage: "info.circle", tint: Theme.textSecondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Running with limitations")
+                            .font(.wvHeadline)
+                            .foregroundStyle(Theme.textPrimary)
+                        ForEach(missingOptionalPermissions) { permission in
+                            Text("\(permission.title): \(permission.limitationWithout ?? "")")
+                                .font(.wvBody)
+                                .foregroundStyle(Theme.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Button("Grant in Settings") { presenter.navigate(to: .settings) }
+                            .buttonStyle(.wvSecondary)
+                            .padding(.top, 2)
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
         }
     }
 
@@ -103,6 +138,8 @@ struct OverviewView: View {
 struct HotkeyView: View {
     @ObservedObject var presenter: DictationPresenter
     @ObservedObject var binding: HotkeyBindingStore
+    let toggleStore: ToggleShortcutStore
+    let toggleShortcut: CarbonToggleShortcut?
     var captureSuspender: HotkeyCaptureSuspending?
 
     private var listening: Bool { presenter.hotkeyHealth == .listening }
@@ -134,6 +171,16 @@ struct HotkeyView: View {
             }
 
             resetLine
+
+            if let toggleShortcut {
+                WVCard(padding: 6) {
+                    ToggleShortcutRow(
+                        store: toggleStore,
+                        shortcut: toggleShortcut,
+                        captureSuspender: captureSuspender
+                    )
+                }
+            }
 
             WVDisclosureCard(label: "Troubleshooting", chevronLeading: true) {
                 troubleshooting
@@ -252,6 +299,88 @@ struct HotkeyView: View {
                 .font(.wvCaption)
                 .foregroundStyle(Theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// The permission-free toggle shortcut: registered as a system hot key, so
+/// it keeps working when Input Monitoring cannot be granted.
+private struct ToggleShortcutRow: View {
+    @ObservedObject var store: ToggleShortcutStore
+    @ObservedObject var shortcut: CarbonToggleShortcut
+    var captureSuspender: HotkeyCaptureSuspending?
+
+    var body: some View {
+        HStack(alignment: .center, spacing: Theme.Space.sm) {
+            WVIconBadge(systemImage: "command")
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Toggle Dictation")
+                    .font(.wvRowTitle)
+                    .foregroundStyle(Theme.textPrimary)
+                Text("Press once to record, again to insert. Works without Input Monitoring.")
+                    .font(.wvCaption)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            Spacer(minLength: Theme.Space.md)
+            VStack(alignment: .trailing, spacing: 5) {
+                HStack(spacing: 8) {
+                    if let binding = store.binding {
+                        WVKeycapChord(keys: binding.keyLabels)
+                    } else {
+                        Text("Off")
+                            .font(.wvKeycap)
+                            .foregroundStyle(Theme.textTertiary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                Theme.inset,
+                                in: RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous)
+                            )
+                    }
+                    HotkeyRecorder(
+                        captureSuspender: captureSuspender,
+                        onRecord: { store.binding = $0 }
+                    )
+                    .fixedSize()
+                    if store.binding == ToggleShortcutStore.defaultBinding {
+                        Button("Turn Off") { store.binding = nil }
+                            .buttonStyle(.wvGhost)
+                    } else {
+                        Button("Reset") { store.binding = ToggleShortcutStore.defaultBinding }
+                            .buttonStyle(.wvGhost)
+                    }
+                }
+                statusLine
+            }
+        }
+        .padding(12)
+    }
+
+    @ViewBuilder
+    private var statusLine: some View {
+        switch shortcut.status {
+        case .active:
+            statusDot("Active", color: Theme.success)
+        case .sharedWithPrimary:
+            statusDot("Same keys as Push-to-Talk", color: Theme.textTertiary)
+        case .off:
+            EmptyView()
+        case .unavailable(let reason):
+            Text(reason)
+                .font(.wv(11, .medium))
+                .foregroundStyle(Theme.warning)
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 320, alignment: .trailing)
+        }
+    }
+
+    private func statusDot(_ text: String, color: Color) -> some View {
+        HStack(spacing: 5) {
+            Circle().fill(color).frame(width: 5, height: 5)
+            Text(text)
+                .font(.wv(11, .medium))
+                .foregroundStyle(color)
         }
     }
 }

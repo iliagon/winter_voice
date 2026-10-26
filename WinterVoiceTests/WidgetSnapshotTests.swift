@@ -68,6 +68,9 @@ final class WidgetSnapshotTests: XCTestCase {
         try snap("2-transcribing")
         model.phase = .done
         try snap("3-done")
+        model.isCopied = true
+        try snap("3-done-copied")
+        model.isCopied = false
         model.phase = .failed(DictationFailure(
             message: "Remote transcription failed (HTTP 503).",
             recovery: "Open Settings and allow MacVoice in Privacy & Security → Accessibility."

@@ -39,6 +39,12 @@ struct RecordingPanelView: View {
         case .done:
             pill {
                 CheckmarkBadge(drawsInstantly: drawsCheckmarkInstantly)
+                if model.isCopied {
+                    Text("Copied · ⌘V")
+                        .font(.wv(11.5, .semibold))
+                        .foregroundStyle(.white)
+                        .fixedSize()
+                }
             }
             .transition(.opacity)
         case .failed(let failure):

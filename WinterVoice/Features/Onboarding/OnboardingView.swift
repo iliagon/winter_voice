@@ -51,7 +51,7 @@ struct OnboardingView: View {
                 Text("Set up MacVoice")
                     .font(.wv(21, .semibold))
                     .foregroundStyle(Theme.textPrimary)
-                Text("Three permissions, then your voice types everywhere.")
+                Text("Microphone is required; the other two unlock Fn and typing at the caret.")
                     .font(.wvCaption)
                     .foregroundStyle(Theme.textSecondary)
             }
@@ -118,6 +118,15 @@ struct OnboardingView: View {
                     color: status == .authorized ? Theme.success : Theme.warning,
                     filled: true
                 )
+
+                if status != .authorized, let limitation = permission.limitationWithout {
+                    Text(limitation)
+                        .font(.wvCaption)
+                        .foregroundStyle(Theme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: 460)
+                }
 
                 if status != .authorized {
                     // One action per state: request while macOS has not

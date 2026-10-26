@@ -24,11 +24,13 @@ If the caret cannot be located (some Chromium/Electron fields), the pill appears
 | Word-replacement dictionary, usage statistics | Removed |
 | Bundle ID `com.winterzxzz.WinterVoice` | `com.iliagon.Dictation` |
 
+**Without administrator rights** (Input Monitoring and Accessibility need an admin password): press **⌃⌥Space** to start and again to stop — this shortcut is a system hot key that needs no permission (change or turn it off under Shortcuts). Without Accessibility the transcript is copied to the clipboard and the pill shows *Copied · ⌘V*. Only the microphone is required.
+
 Kept as-is: configurable hotkey (hold or toggle), insertion through Accessibility with a clipboard/⌘V fallback that restores the clipboard, secure-field detection, local history, microphone selection, launch at login.
 
 ## Setup
 
-- **Permissions:** Microphone, Input Monitoring (the global hotkey), and Accessibility (reading the caret and inserting text). The first-launch guide walks through them.
+- **Permissions:** Microphone (required), Input Monitoring (Fn as the hotkey) and Accessibility (reading the caret and inserting text). The first-launch guide walks through them; the last two are optional.
 - **Globe key:** set *System Settings → Keyboard → Press 🌐 key to* **Do Nothing**, otherwise macOS also switches the input source or opens the emoji picker on every dictation.
 - **Transcription:** Settings → Transcription: base URL (e.g. `https://api.openai.com/v1`), model (e.g. `whisper-1`), optional API key and language.
 
