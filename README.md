@@ -46,7 +46,7 @@ ruby scripts/generate-project.rb
 xcodebuild -project WinterVoice.xcodeproj -scheme WinterVoice -configuration Debug build
 ```
 
-The Xcode project is generated from `scripts/generate-project.rb` (needs the `xcodeproj` gem); regenerate it after adding or removing source files. The app signs with an Apple Development identity so macOS keeps its permissions across rebuilds. `open MacVoice.app --args -WVWidgetDemo` loops the pill through every state without a microphone.
+The Xcode project is generated from `scripts/generate-project.rb` (needs the `xcodeproj` gem); regenerate it after adding or removing source files. The app signs with an Apple Development identity so macOS keeps its permissions across rebuilds. Ad-hoc builds (`CODE_SIGN_IDENTITY=-`) get the bundle ID `com.iliagon.Dictation.adhoc`, so their permission grants never shadow the signed app's. `open MacVoice.app --args -WVWidgetDemo` loops the pill through every state without a microphone.
 
 Plan and progress of the fork: [docs/FORK-PLAN.md](docs/FORK-PLAN.md). Upstream developer notes (partly outdated for this fork): [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
