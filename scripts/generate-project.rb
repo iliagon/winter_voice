@@ -38,7 +38,13 @@ Dir.glob(File.join(root, 'WinterVoiceTests', '**', '*.swift')).sort.each do |pat
 end
 
 app.build_configurations.each do |config|
-  config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.iliagon.Dictation'
+  # TCC pins an ad-hoc build's grants to its cdhash. If an ad-hoc build
+  # (`CODE_SIGN_IDENTITY=-`, e.g. a CLI test run) shares the bundle ID, its
+  # stale row shadows the Apple Development build: the System Settings toggle
+  # is ON, yet AXIsProcessTrusted() stays false. `-` maps to `_` under
+  # :identifier, so only ad-hoc builds pick up the `.adhoc` suffix.
+  config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.iliagon.Dictation$(WV_BUNDLE_ID_SUFFIX_$(CODE_SIGN_IDENTITY:identifier))'
+  config.build_settings['WV_BUNDLE_ID_SUFFIX__'] = '.adhoc'
   # The shipped app is MacVoice.app; the target and Swift module keep the
   # WinterVoice name so the fork stays diffable against upstream.
   config.build_settings['PRODUCT_NAME'] = 'MacVoice'

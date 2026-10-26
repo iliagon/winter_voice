@@ -505,6 +505,31 @@
 			};
 			name = Release;
 		};
+		20982291876C21BD882406F03D64849E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = WinterVoice/Resources/WinterVoice.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = DPGLZB4Y9K;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WinterVoice/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.iliagon.Dictation$(WV_BUNDLE_ID_SUFFIX_$(CODE_SIGN_IDENTITY:identifier))";
+				PRODUCT_MODULE_NAME = WinterVoice;
+				PRODUCT_NAME = MacVoice;
+				SDKROOT = macosx;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				WV_BUNDLE_ID_SUFFIX__ = .adhoc;
+			};
+			name = Release;
+		};
 		543C77C9274AD7940C2CE203FC53F323 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -633,7 +658,7 @@
 			};
 			name = Debug;
 		};
-		A41C2654E3BF8AB6E6129D90E584C6F3 /* Release */ = {
+		89EA39D765F1C6FBA9E328670F67489E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -648,36 +673,13 @@
 				INFOPLIST_FILE = WinterVoice/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.iliagon.Dictation;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.iliagon.Dictation$(WV_BUNDLE_ID_SUFFIX_$(CODE_SIGN_IDENTITY:identifier))";
 				PRODUCT_MODULE_NAME = WinterVoice;
 				PRODUCT_NAME = MacVoice;
 				SDKROOT = macosx;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
-			};
-			name = Release;
-		};
-		DAB48E0A76C247B34A9DDE3B96785AD0 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = WinterVoice/Resources/WinterVoice.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Manual;
-				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = DPGLZB4Y9K;
-				ENABLE_HARDENED_RUNTIME = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = WinterVoice/Resources/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.iliagon.Dictation;
-				PRODUCT_MODULE_NAME = WinterVoice;
-				PRODUCT_NAME = MacVoice;
-				SDKROOT = macosx;
-				SWIFT_STRICT_CONCURRENCY = complete;
-				SWIFT_VERSION = 6.0;
+				WV_BUNDLE_ID_SUFFIX__ = .adhoc;
 			};
 			name = Debug;
 		};
@@ -696,8 +698,8 @@
 		117FECCF174246609515A87729990576 /* Build configuration list for PBXNativeTarget "WinterVoice" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				DAB48E0A76C247B34A9DDE3B96785AD0 /* Debug */,
-				A41C2654E3BF8AB6E6129D90E584C6F3 /* Release */,
+				89EA39D765F1C6FBA9E328670F67489E /* Debug */,
+				20982291876C21BD882406F03D64849E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
